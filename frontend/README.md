@@ -1,36 +1,188 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DeskDibs
 
-## Getting Started
+A desk and meeting-room reservation application built with **FastAPI**, **PostgreSQL**, and **Next.js**.
 
-First, run the development server:
+## Prerequisites
+
+Before running the project, make sure you have installed:
+
+* Python 3.12+ (or the version used by the team)
+* Node.js and npm
+* PostgreSQL
+* pgAdmin 4 (optional, for database management)
+
+---
+
+## Database Setup
+
+1. Open PostgreSQL/pgAdmin.
+2. Create a new database named:
+
+```sql
+deskdibs
+```
+
+3. Configure your backend `.env` file:
+
+```env
+DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/deskdibs
+```
+
+Replace `YOUR_PASSWORD` with your PostgreSQL password.
+
+---
+
+## Backend Setup
+
+Navigate to the backend folder:
+
+```bash
+cd backend
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv venv
+```
+
+Activate the virtual environment:
+
+### Windows
+
+```bash
+venv\Scripts\activate
+```
+
+### Linux / macOS
+
+```bash
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start the FastAPI server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Backend will run at:
+
+```text
+http://localhost:8000
+```
+
+API documentation:
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## Frontend Setup
+
+Navigate to the frontend folder:
+
+```bash
+cd frontend
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Frontend will run at:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```text
+DeskDibs/
+│
+├── backend/
+│   ├── app/
+│   ├── requirements.txt
+│   └── .env
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── package-lock.json
+│
+└── README.md
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Team Workflow
 
-## Deploy on Vercel
+1. Pull the latest changes:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+git pull
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Create a new branch:
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+3. Commit your changes:
+
+```bash
+git add .
+git commit -m "Add feature"
+```
+
+4. Push your branch:
+
+```bash
+git push origin feature/your-feature-name
+```
+
+5. Open a Pull Request for review.
+
+---
+
+## Tech Stack
+
+### Backend
+
+* FastAPI
+* SQLAlchemy
+* PostgreSQL
+* Alembic
+* JWT Authentication
+
+### Frontend
+
+* Next.js
+* React
+* Axios
+* Recharts
+
+### Database
+
+* PostgreSQL
