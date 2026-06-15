@@ -1,5 +1,6 @@
+from app.models.floor_plan import FloorPlan
 from app.models.reservation import Reservation
 from app.models.resource import Resource
 from app.models.user import User
 
-__all__ = ["User", "Resource", "Reservation"]
+__all__ = ["User", "Resource", "Reservation", "FloorPlan"]
