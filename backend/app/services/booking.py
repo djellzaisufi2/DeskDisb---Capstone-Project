@@ -131,6 +131,32 @@ def create_reservation(
     return reservation
 
 
+def create_recurring_reservations(
+    db: Session,
+    user: User,
+    resource_id: int,
+    booking_date: date,
+    repeat_weeks: int,
+    start_time: time | None = None,
+    end_time: time | None = None,
+) -> list[Reservation]:
+    created = [
+        create_reservation(db, user, resource_id, booking_date, start_time, end_time),
+    ]
+    for week in range(1, max(0, repeat_weeks) + 1):
+        created.append(
+            create_reservation(
+                db,
+                user,
+                resource_id,
+                booking_date + timedelta(days=7 * week),
+                start_time,
+                end_time,
+            )
+        )
+    return created
+
+
 def update_reservation(
     db: Session,
     reservation: Reservation,

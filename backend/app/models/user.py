@@ -1,6 +1,7 @@
 import enum
+from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -25,6 +26,9 @@ class User(Base):
     team_leader_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    password_reset_token_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    must_change_password: Mapped[bool] = mapped_column(default=False)
 
     reservations = relationship("Reservation", back_populates="user")
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")

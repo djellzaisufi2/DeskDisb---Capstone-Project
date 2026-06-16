@@ -46,6 +46,12 @@ def startup():
                 conn.execute(text("ALTER TABLE reservations ADD COLUMN start_time TIME"))
             if "end_time" not in reservation_col_names:
                 conn.execute(text("ALTER TABLE reservations ADD COLUMN end_time TIME"))
+            if "password_reset_token_hash" not in user_col_names:
+                conn.execute(text("ALTER TABLE users ADD COLUMN password_reset_token_hash VARCHAR(255)"))
+            if "password_reset_expires_at" not in user_col_names:
+                conn.execute(text("ALTER TABLE users ADD COLUMN password_reset_expires_at DATETIME"))
+            if "must_change_password" not in user_col_names:
+                conn.execute(text("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT 0"))
 
             resource_cols = conn.execute(text("PRAGMA table_info(resources)")).fetchall()
             resource_col_names = {c[1] for c in resource_cols}

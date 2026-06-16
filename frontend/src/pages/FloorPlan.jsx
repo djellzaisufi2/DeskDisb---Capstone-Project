@@ -5,10 +5,12 @@ import { Calendar, Filter, Layers, LocateFixed } from 'lucide-react';
 import {
   addFavorite,
   createReservation,
+  createTeamBookings,
   getFloorPlans,
   getFloors,
   getResources,
   getMyReservations,
+  getTeamMembers,
   getTeamDeskRecommendations,
   getZones,
   removeFavorite,
@@ -17,6 +19,7 @@ import DeskDetailPanel from '../components/DeskDetailPanel';
 import ResourceDetailsModal from '../components/ResourceDetailsModal';
 import PageHeader from '../components/ui/PageHeader';
 import { ZONE_OPTIONS } from '../lib/constants';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS = {
   available: { dot: 'bg-emerald-500', ring: 'ring-emerald-300', label: 'Available' },
@@ -47,6 +50,14 @@ export default function FloorPlan() {
   const [reservationMode, setReservationMode] = useState('all_day');
   const [roomStartTime, setRoomStartTime] = useState('09:00');
   const [roomEndTime, setRoomEndTime] = useState('17:00');
+  const [teamBookingOpen, setTeamBookingOpen] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamBookingBusy, setTeamBookingBusy] = useState(false);
+  const [teamBookingMessage, setTeamBookingMessage] = useState('');
+  const [teamAssignments, setTeamAssignments] = useState({});
+  const [showRecurring, setShowRecurring] = useState(false);
+  const [recurringWeeks, setRecurringWeeks] = useState(0);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (floorFromQuery && floorFromQuery !== floor) {
@@ -76,7 +87,9 @@ export default function FloorPlan() {
             ? `Team desks are usually near ${data.team_zone}`
             : 'No team desk history yet, showing a broad set of suggestions',
         );
-        setResources(data.resources);
+        setResources(
+          user?.role === 'employee' ? data.resources.filter((r) => r.type !== 'room') : data.resources,
+        );
         if (data.resources?.length && !floor) {
           setFloor(data.resources[0].floor);
         }
@@ -94,9 +107,9 @@ export default function FloorPlan() {
         zoneFilters.length > 1
           ? data.filter((r) => zoneFilters.includes(r.zone))
           : data;
-      setResources(filtered);
+      setResources(user?.role === 'employee' ? filtered.filter((r) => r.type !== 'room') : filtered);
     });
-  }, [date, floor, zone, zoneFilters, type, nearTeam]);
+  }, [date, floor, zone, zoneFilters, type, nearTeam, user?.role]);
 
   useEffect(() => {
     if (selected?.type !== 'room') {
@@ -116,6 +129,17 @@ export default function FloorPlan() {
       setSelected(match);
     }
   }, [resourceId, resources]);
+
+  useEffect(() => {
+    if (!teamBookingOpen || user?.role !== 'team_leader') return;
+    getTeamMembers().then(setTeamMembers).catch(() => setTeamMembers([]));
+  }, [teamBookingOpen, user?.role]);
+
+  useEffect(() => {
+    if (user?.role === 'employee' && type === 'room') {
+      setType('');
+    }
+  }, [type, user?.role]);
 
   const plan = plans.find((p) => p.floor === floor);
   const maxDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
@@ -155,7 +179,7 @@ export default function FloorPlan() {
 
       const startTime = selected.type === 'room' && reservationMode === 'slot' ? roomStartTime : null;
       const endTime = selected.type === 'room' && reservationMode === 'slot' ? roomEndTime : null;
-      await createReservation(selected.id, date, startTime, endTime);
+      await createReservation(selected.id, date, startTime, endTime, recurringWeeks);
       setMessage('Reservation confirmed successfully!');
       const updated = await getResources({
         date,
@@ -166,6 +190,8 @@ export default function FloorPlan() {
       setResources(updated);
       setSelected(null);
       setDetailsOpen(false);
+      setShowRecurring(false);
+      setRecurringWeeks(0);
     } catch (err) {
       const msg =
         err?.response?.data?.detail ??
@@ -173,6 +199,52 @@ export default function FloorPlan() {
       setMessage(String(msg));
     } finally {
       setBooking(false);
+    }
+  };
+
+  const openTeamBooking = () => {
+    if (!selected || selected.type !== 'desk') return;
+    setTeamBookingMessage('');
+    setTeamAssignments({});
+    setTeamBookingOpen(true);
+  };
+
+  const closeTeamBooking = () => {
+    setTeamBookingOpen(false);
+    setTeamBookingMessage('');
+    setTeamAssignments({});
+  };
+
+  const handleTeamBookingSubmit = async () => {
+    if (!selected) return;
+    const assignments = Object.entries(teamAssignments)
+      .map(([userId, resourceId]) => ({ user_id: Number(userId), resource_id: Number(resourceId) }))
+      .filter((item) => item.user_id && item.resource_id);
+    if (!assignments.length) {
+      setTeamBookingMessage('Choose a desk for at least one teammate.');
+      return;
+    }
+    setTeamBookingBusy(true);
+    setTeamBookingMessage('');
+    try {
+      await createTeamBookings(date, assignments, recurringWeeks);
+      setTeamBookingMessage('Team desks reserved successfully.');
+      const updated = await getResources({
+        date,
+        floor,
+        zone,
+        type: type || undefined,
+      });
+      setResources(updated);
+      setSelected(null);
+      setDetailsOpen(false);
+      closeTeamBooking();
+      setShowRecurring(false);
+      setRecurringWeeks(0);
+    } catch (err) {
+      setTeamBookingMessage(String(err?.response?.data?.detail ?? 'Could not reserve team desks.'));
+    } finally {
+      setTeamBookingBusy(false);
     }
   };
 
@@ -273,7 +345,7 @@ export default function FloorPlan() {
           >
             <option value="">All resources</option>
             <option value="desk">Desks only</option>
-            <option value="room">Rooms only</option>
+            {user?.role !== 'employee' && <option value="room">Rooms only</option>}
           </select>
         </div>
       </div>
@@ -360,10 +432,17 @@ export default function FloorPlan() {
             date={date}
             onClose={() => setSelected(null)}
             onBook={handleBook}
+            onBookTeam={openTeamBooking}
             onMoreDetails={openDetails}
             booking={booking}
             favoriteBusy={favoriteBusy}
             onToggleFavorite={handleToggleFavorite}
+            canBookTeam={user?.role === 'team_leader'}
+            canReserveRoom={user?.role === 'team_leader' || user?.role === 'manager'}
+            showRecurring={showRecurring}
+            setShowRecurring={setShowRecurring}
+            recurringWeeks={recurringWeeks}
+            setRecurringWeeks={setRecurringWeeks}
             reservationMode={reservationMode}
             setReservationMode={setReservationMode}
             roomStartTime={roomStartTime}
@@ -386,6 +465,133 @@ export default function FloorPlan() {
           favoriteBusy={favoriteBusy}
           booking={booking}
         />
+      )}
+
+      {teamBookingOpen && selected && user?.role === 'team_leader' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900">Book desks for your team</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Assign a desk to each team member for {format(new Date(date + 'T12:00:00'), 'EEEE, MMM d')}.
+                </p>
+              </div>
+              <button type="button" onClick={closeTeamBooking} className="rounded-full bg-slate-100 px-3 py-2 text-sm">
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[60vh] overflow-auto rounded-2xl border border-slate-200 p-4">
+              <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Recurrence
+                </label>
+                <select
+                  value={recurringWeeks}
+                  onChange={(e) => setRecurringWeeks(Number(e.target.value))}
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value={0}>This week only</option>
+                  <option value={1}>2 weeks total</option>
+                  <option value={3}>4 weeks total</option>
+                  <option value={7}>8 weeks total</option>
+                </select>
+              </div>
+              {teamMembers.length === 0 ? (
+                <p className="text-sm text-slate-500">No team members found for your account.</p>
+              ) : (
+                <div className="space-y-4">
+                  {teamMembers.map((member) => (
+                    <div key={member.id} className="grid gap-3 rounded-2xl border border-slate-200 p-3 md:grid-cols-[1fr_220px]">
+                      <div>
+                        <div className="font-semibold text-slate-900">{member.full_name}</div>
+                        <div className="text-xs text-slate-500">{member.job_title ?? member.email}</div>
+                      </div>
+                      <select
+                        value={teamAssignments[member.id] ?? ''}
+                        onChange={(e) =>
+                          setTeamAssignments((prev) => ({
+                            ...prev,
+                            [member.id]: e.target.value,
+                          }))
+                        }
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      >
+                        <option value="">Select a desk</option>
+                        {resources
+                          .filter((r) => r.type === 'desk' && r.is_available)
+                          .map((resource) => (
+                            <option key={resource.id} value={resource.id}>
+                              {resource.name} - Floor {resource.floor}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {teamBookingMessage && (
+              <p className="mt-4 text-sm text-slate-600">{teamBookingMessage}</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={closeTeamBooking} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleTeamBookingSubmit}
+                disabled={teamBookingBusy}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {teamBookingBusy ? 'Saving...' : 'Save Team Bookings'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRecurring && selected && selected.type === 'desk' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-2xl font-bold text-slate-900">Recurring reservation</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Repeat the desk booking weekly starting {format(new Date(date + 'T12:00:00'), 'EEE, MMM d')}.
+            </p>
+            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Repeat for
+            </label>
+            <select
+              value={recurringWeeks}
+              onChange={(e) => setRecurringWeeks(Number(e.target.value))}
+              className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value={0}>This week only</option>
+              <option value={1}>2 weeks total</option>
+              <option value={3}>4 weeks total</option>
+              <option value={7}>8 weeks total</option>
+            </select>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRecurring(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBook}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
+              >
+                Save recurring booking
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="card mt-4 overflow-hidden">

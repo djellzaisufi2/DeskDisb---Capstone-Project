@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pencil, Trash2, Upload, X } from 'lucide-react';
 import {
+  createResource,
   deleteFloorPlan,
   getFloorPlans,
   getResources,
@@ -15,6 +16,17 @@ const emptyPlanForm = {
   floor: '1',
 };
 
+const emptyResourceForm = {
+  name: '',
+  type: 'desk',
+  building: 'HQ - Prishtina',
+  floor: '',
+  zone: 'Open Area',
+  capacity: 1,
+  desk_type: 'Hot Desk',
+  amenities: '',
+};
+
 export default function FloorBuilder() {
   const [floor, setFloor] = useState('');
   const [resources, setResources] = useState([]);
@@ -23,8 +35,11 @@ export default function FloorBuilder() {
   const [selected, setSelected] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [planForm, setPlanForm] = useState(emptyPlanForm);
+  const [resourceForm, setResourceForm] = useState(emptyResourceForm);
+  const [creatingResource, setCreatingResource] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [savingResource, setSavingResource] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
@@ -51,6 +66,15 @@ export default function FloorBuilder() {
 
     getResources({ floor }).then(setResources).catch(() => setResources([]));
   }, [floor]);
+
+  useEffect(() => {
+    if (!floor) return;
+    setResourceForm((current) => ({
+      ...current,
+      floor: current.floor || floor,
+      building: current.building || plan?.building || 'HQ - Prishtina',
+    }));
+  }, [floor, plan]);
 
   const plan = plans.find((item) => item.floor === floor) ?? null;
   const headerTitle = plan ? `Floor Plan Builder - Floor ${plan.floor}` : 'Floor Plan Builder';
@@ -169,6 +193,40 @@ export default function FloorBuilder() {
     }
   };
 
+  const handleCreateResource = async () => {
+    if (!resourceForm.name.trim() || !resourceForm.floor.trim()) return;
+
+    setSavingResource(true);
+    setMessage('');
+    try {
+      await createResource({
+        ...resourceForm,
+        name: resourceForm.name.trim(),
+        building: resourceForm.building.trim() || plan?.building || 'HQ - Prishtina',
+        floor: resourceForm.floor.trim(),
+        zone: resourceForm.zone.trim(),
+        amenities: resourceForm.amenities.trim() || undefined,
+        desk_type:
+          resourceForm.type === 'room'
+            ? 'Meeting Room'
+            : resourceForm.desk_type.trim() || undefined,
+      });
+      const updated = await getResources({ floor: resourceForm.floor.trim() });
+      setResources(updated);
+      setResourceForm({
+        ...emptyResourceForm,
+        floor: floor || plan?.floor || '',
+        building: plan?.building || 'HQ - Prishtina',
+      });
+      setCreatingResource(false);
+      setMessage('Resource saved successfully and is now available across the app.');
+    } catch (error) {
+      setMessage(error?.response?.data?.detail ?? 'Could not save this resource.');
+    } finally {
+      setSavingResource(false);
+    }
+  };
+
   const handleCanvasClick = async (e) => {
     if (!selected || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -275,6 +333,113 @@ export default function FloorBuilder() {
               <p className="text-sm text-slate-500">
                 Selected: <strong>{selected.name}</strong> - click canvas to place or drag pin
               </p>
+            )}
+          </div>
+
+          <div className="card mb-4 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">Add Resource</h4>
+                <p className="text-xs text-slate-500">
+                  Create a desk or meeting room and save it to show everywhere in the app.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreatingResource((current) => !current)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                {creatingResource ? 'Close' : 'New Resource'}
+              </button>
+            </div>
+
+            {creatingResource && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input
+                  value={resourceForm.name}
+                  onChange={(e) => setResourceForm({ ...resourceForm, name: e.target.value })}
+                  placeholder="Resource name"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <select
+                  value={resourceForm.type}
+                  onChange={(e) =>
+                    setResourceForm({
+                      ...resourceForm,
+                      type: e.target.value,
+                      desk_type: e.target.value === 'room' ? 'Meeting Room' : resourceForm.desk_type,
+                    })
+                  }
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="desk">Desk</option>
+                  <option value="room">Meeting Room</option>
+                </select>
+                <input
+                  value={resourceForm.floor}
+                  onChange={(e) => setResourceForm({ ...resourceForm, floor: e.target.value })}
+                  placeholder="Floor"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <input
+                  value={resourceForm.building}
+                  onChange={(e) => setResourceForm({ ...resourceForm, building: e.target.value })}
+                  placeholder="HQ location"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <input
+                  value={resourceForm.zone}
+                  onChange={(e) => setResourceForm({ ...resourceForm, zone: e.target.value })}
+                  placeholder="Zone"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={resourceForm.capacity}
+                  onChange={(e) => setResourceForm({ ...resourceForm, capacity: Number(e.target.value) })}
+                  placeholder="Capacity"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                {resourceForm.type === 'desk' ? (
+                  <input
+                    value={resourceForm.desk_type}
+                    onChange={(e) => setResourceForm({ ...resourceForm, desk_type: e.target.value })}
+                    placeholder="Desk type"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+                  />
+                ) : null}
+                <input
+                  value={resourceForm.amenities}
+                  onChange={(e) => setResourceForm({ ...resourceForm, amenities: e.target.value })}
+                  placeholder="Amenities, comma-separated"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+                />
+                <div className="flex gap-2 sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateResource}
+                    disabled={savingResource}
+                    className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {savingResource ? 'Saving...' : 'Save Resource'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatingResource(false);
+                      setResourceForm({
+                        ...emptyResourceForm,
+                        floor: floor || plan?.floor || '',
+                        building: plan?.building || 'HQ - Prishtina',
+                      });
+                    }}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 

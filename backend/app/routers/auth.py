@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -11,7 +13,16 @@ from app.auth import (
 )
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import Token, UserCreate, UserOut
+from app.schemas.auth import PasswordResetRequest, Token, UserCreate, UserOut
+from app.services.notifications import (
+    build_reset_link,
+    generate_reset_token,
+    generate_temporary_password,
+    hash_token,
+    reset_token_expiry,
+    send_email,
+    token_matches,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,17 +54,65 @@ def register(
 ):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    # Password hashohet para ruajtjes — API nuk e kthen kurrë
+
+    temporary_password = generate_temporary_password()
+    reset_token = generate_reset_token()
     user = User(
         email=data.email,
-        hashed_password=hash_password(data.password),
+        hashed_password=hash_password(temporary_password),
         full_name=data.full_name,
         role=data.role,
         job_title=data.job_title,
         team_name=data.team_name,
         team_leader_id=data.team_leader_id,
+        password_reset_token_hash=hash_token(reset_token),
+        password_reset_expires_at=reset_token_expiry(),
+        must_change_password=True,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    send_email(
+        user.email,
+        "Your DeskDibs account is ready",
+        "\n".join(
+            [
+                f"Hello {user.full_name},",
+                "",
+                "Your DeskDibs account has been created.",
+                f"Temporary passcode: {temporary_password}",
+                "",
+                f"Reset your password here: {build_reset_link(reset_token)}",
+                "",
+                "If you did not expect this email, please contact your office manager.",
+            ]
+        ),
+    )
     return user
+
+
+@router.post("/reset-password")
+def reset_password(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    candidates = (
+        db.query(User)
+        .filter(User.password_reset_token_hash.isnot(None))
+        .filter(User.password_reset_expires_at.isnot(None))
+        .all()
+    )
+    target_user = next(
+        (item for item in candidates if token_matches(data.token, item.password_reset_token_hash)),
+        None,
+    )
+    if not target_user or not target_user.password_reset_expires_at:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    if target_user.password_reset_expires_at < now:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    target_user.hashed_password = hash_password(data.password)
+    target_user.password_reset_token_hash = None
+    target_user.password_reset_expires_at = None
+    target_user.must_change_password = False
+    db.commit()
+    return {"detail": "Password updated"}

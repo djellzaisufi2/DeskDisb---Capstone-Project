@@ -90,12 +90,13 @@ export async function getAllReservations(date = null) {
   return data;
 }
 
-export async function createReservation(resource_id, date, start_time = null, end_time = null) {
+export async function createReservation(resource_id, date, start_time = null, end_time = null, repeat_weeks = 0) {
   const { data } = await api.post('/reservations', {
     resource_id,
     date,
     start_time,
     end_time,
+    repeat_weeks,
   });
   return data;
 }
@@ -154,6 +155,11 @@ export async function getUsers() {
   return data;
 }
 
+export async function getTeamMembers() {
+  const { data } = await api.get('/users/team-members');
+  return data;
+}
+
 export async function searchWorkspace(query) {
   const { data } = await api.get('/users/search', {
     params: { q: query },
@@ -168,5 +174,15 @@ export async function assignTeamMembers(leaderId, teammateIds) {
 
 export async function registerUser(body) {
   const { data } = await api.post('/auth/register', body);
+  return data;
+}
+
+export async function resetPassword(token, password) {
+  const { data } = await api.post('/auth/reset-password', { token, password });
+  return data;
+}
+
+export async function createTeamBookings(date, bookings, repeat_weeks = 0) {
+  const { data } = await api.post('/reservations/team-bookings', { date, bookings, repeat_weeks });
   return data;
 }

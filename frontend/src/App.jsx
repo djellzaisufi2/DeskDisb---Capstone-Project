@@ -12,6 +12,7 @@ import Resources from './pages/admin/Resources';
 import FloorBuilder from './pages/admin/FloorBuilder';
 import Analytics from './pages/admin/Analytics';
 import Users from './pages/admin/Users';
+import ResetPassword from './pages/ResetPassword';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             element={
               <ProtectedRoute>

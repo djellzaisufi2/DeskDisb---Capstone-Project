@@ -9,12 +9,16 @@ class UserLogin(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
     full_name: str
     role: UserRole = UserRole.employee
     job_title: str | None = None
     team_name: str | None = None
     team_leader_id: int | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    token: str
+    password: str
 
 
 class UserOut(BaseModel):

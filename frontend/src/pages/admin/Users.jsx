@@ -13,7 +13,6 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({
     email: '',
-    password: '',
     full_name: '',
     job_title: '',
     role: 'employee',
@@ -34,7 +33,6 @@ export default function Users() {
     });
     setForm({
       email: '',
-      password: '',
       full_name: '',
       job_title: '',
       role: 'employee',
@@ -100,14 +98,10 @@ export default function Users() {
             onChange={(e) => setForm({ ...form, job_title: e.target.value })}
             className="input-field"
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="input-field"
-            required
-          />
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500 sm:col-span-2">
+            A temporary passcode and password reset email will be sent automatically after
+            creation.
+          </div>
           <select
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}

@@ -5,11 +5,22 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user, require_admin
 from app.database import get_db
+from app.models.resource import Resource, ResourceType
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.user import User, UserRole
-from app.schemas.reservation import ReservationCreate, ReservationOut, ReservationUpdate
+from app.schemas.reservation import (
+    ReservationCreate,
+    ReservationOut,
+    ReservationUpdate,
+    TeamDeskBookingCreate,
+)
 from app.schemas.resource import ResourceOut
-from app.services.booking import cancel_reservation, create_reservation, update_reservation
+from app.services.booking import (
+    cancel_reservation,
+    create_recurring_reservations,
+    create_reservation,
+    update_reservation,
+)
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
@@ -56,12 +67,30 @@ def all_reservations(
     return [_to_out(r) for r in query.all()]
 
 
-@router.post("", response_model=ReservationOut, status_code=201)
+@router.post("", response_model=ReservationOut | list[ReservationOut], status_code=201)
 def book(
     data: ReservationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if data.repeat_weeks:
+        reservations = create_recurring_reservations(
+            db,
+            current_user,
+            data.resource_id,
+            data.date,
+            data.repeat_weeks,
+            data.start_time,
+            data.end_time,
+        )
+        results = (
+            db.query(Reservation)
+            .options(joinedload(Reservation.resource), joinedload(Reservation.user))
+            .filter(Reservation.id.in_([reservation.id for reservation in reservations]))
+            .all()
+        )
+        return [_to_out(r) for r in results]
+
     reservation = create_reservation(
         db,
         current_user,
@@ -128,3 +157,47 @@ def admin_update_reservation(
         .first()
     )
     return _to_out(reservation)
+
+
+@router.post("/team-bookings", response_model=list[ReservationOut], status_code=201)
+def book_team_desks(
+    data: TeamDeskBookingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.team_leader:
+        raise HTTPException(status_code=403, detail="Team leader access required")
+
+    if not data.bookings:
+        raise HTTPException(status_code=400, detail="Select at least one teammate")
+
+    teammate_ids = {
+        teammate.id
+        for teammate in db.query(User).filter(User.team_leader_id == current_user.id).all()
+    }
+    created: list[Reservation] = []
+    for item in data.bookings:
+        if item.user_id not in teammate_ids:
+            raise HTTPException(status_code=403, detail="One or more selected users are not in your team")
+        resource = db.get(Resource, item.resource_id)
+        if not resource or resource.type != ResourceType.desk:
+            raise HTTPException(status_code=400, detail="Team bookings can only use desks")
+        created.extend(
+            create_recurring_reservations(
+                db,
+                db.get(User, item.user_id),
+                item.resource_id,
+                data.date,
+                data.repeat_weeks,
+                None,
+                None,
+            )
+        )
+
+    results = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.resource), joinedload(Reservation.user))
+        .filter(Reservation.id.in_([r.id for r in created]))
+        .all()
+    )
+    return [_to_out(r) for r in results]

@@ -79,6 +79,22 @@ def list_users(
     return db.query(User).order_by(User.full_name).all()
 
 
+@router.get("/team-members", response_model=list[UserOut])
+def list_team_members(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.team_leader:
+        raise HTTPException(status_code=403, detail="Team leader access required")
+    teammates = (
+        db.query(User)
+        .filter(User.team_leader_id == current_user.id)
+        .order_by(User.full_name)
+        .all()
+    )
+    return teammates
+
+
 @router.post("/{leader_id}/team", response_model=UserOut)
 def assign_team_members(
     leader_id: int,

@@ -7,11 +7,18 @@ export default function DeskDetailPanel({
   date,
   onClose,
   onBook,
+  onBookTeam,
   onMoreDetails,
   booking,
   message,
   favoriteBusy,
   onToggleFavorite,
+  canBookTeam,
+  canReserveRoom,
+  recurringWeeks,
+  setRecurringWeeks,
+  showRecurring,
+  setShowRecurring,
   reservationMode,
   setReservationMode,
   roomStartTime,
@@ -83,7 +90,7 @@ export default function DeskDetailPanel({
           </span>
         </div>
 
-        {desk.type === 'room' && (
+        {desk.type === 'room' && canReserveRoom && (
           <div className="mt-3 space-y-3 rounded-lg border border-slate-200 p-3">
             <div className="flex gap-2">
               <button
@@ -137,11 +144,30 @@ export default function DeskDetailPanel({
             )}
           </div>
         )}
+        {desk.type === 'room' && !canReserveRoom && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Meeting rooms can only be reserved by team leaders and managers.
+          </div>
+        )}
 
         {desk.is_available && !desk.is_mine && (
           <button type="button" onClick={onBook} disabled={booking} className="btn-primary mt-4 w-full">
             <Calendar size={16} />
             {booking ? 'Reserving...' : 'Reserve Now'}
+          </button>
+        )}
+        {desk.type === 'desk' && desk.is_available && !desk.is_mine && (
+          <button
+            type="button"
+            onClick={() => setShowRecurring?.(true)}
+            className="btn-secondary mt-2 w-full"
+          >
+            Recurring reservation
+          </button>
+        )}
+        {canBookTeam && desk.type === 'desk' && (
+          <button type="button" onClick={onBookTeam} className="btn-secondary mt-2 w-full">
+            Book for Team
           </button>
         )}
         <button type="button" onClick={onMoreDetails} className="btn-secondary mt-2 w-full">
@@ -165,6 +191,31 @@ export default function DeskDetailPanel({
           >
             {message}
           </p>
+        )}
+
+        {showRecurring && desk.type === 'desk' && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h4 className="text-sm font-semibold text-slate-900">Recurring reservation</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              Repeat this desk weekly for your team or for yourself.
+            </p>
+            <div className="mt-3">
+              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Repeat for</label>
+              <select
+                value={recurringWeeks}
+                onChange={(e) => setRecurringWeeks(Number(e.target.value))}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value={0}>This week only</option>
+                <option value={1}>2 weeks total</option>
+                <option value={3}>4 weeks total</option>
+                <option value={7}>8 weeks total</option>
+              </select>
+            </div>
+            <button type="button" onClick={() => setShowRecurring?.(false)} className="mt-3 text-sm text-brand-600">
+              Close
+            </button>
+          </div>
         )}
       </div>
     </div>
