@@ -355,7 +355,7 @@ export default function ResourceDetailsModal({
               <div className="mt-6 grid gap-4 rounded-3xl border border-white/50 bg-white/92 p-5 text-sm shadow-xl backdrop-blur md:grid-cols-5">
                 <div>
                   <div className="text-slate-500">Location</div>
-                  <div className="mt-2 font-semibold text-slate-900">{desk.building ?? 'HQ - New York'}</div>
+                  <div className="mt-2 font-semibold text-slate-900">{desk.building ?? 'HQ - Prishtina'}</div>
                   <div className="text-slate-500">{desk.type === 'room' ? 'Meeting space' : 'Workspace zone'}</div>
                 </div>
                 <div>

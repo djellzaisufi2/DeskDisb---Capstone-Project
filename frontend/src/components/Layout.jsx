@@ -308,7 +308,7 @@ export default function Layout() {
               className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               <Building2 size={16} className="text-brand-600" />
-              HQ - New York
+              HQ - Prishtina
               <ChevronDown size={14} className="text-slate-400" />
             </button>
 

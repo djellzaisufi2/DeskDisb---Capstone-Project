@@ -6,7 +6,7 @@ from app.models.resource import ResourceType
 class ResourceBase(BaseModel):
     name: str
     type: ResourceType
-    building: str = "HQ - New York"
+    building: str = "HQ - Prishtina"
     floor: str
     zone: str
     capacity: int = 1

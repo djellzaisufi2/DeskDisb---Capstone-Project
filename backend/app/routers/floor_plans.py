@@ -56,7 +56,7 @@ def list_floor_plans(
 @router.post("", response_model=FloorPlanOut)
 async def upload_floor_plan(
     floor: str = Form(...),
-    building: str = Form("HQ - New York"),
+    building: str = Form("HQ - Prishtina"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),

@@ -17,7 +17,7 @@ class Resource(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     type: Mapped[ResourceType] = mapped_column(Enum(ResourceType))
-    building: Mapped[str] = mapped_column(String(120), default="HQ - New York")
+    building: Mapped[str] = mapped_column(String(120), default="HQ - Prishtina")
     floor: Mapped[str] = mapped_column(String(50))
     zone: Mapped[str] = mapped_column(String(100))
     floor_plan_x: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -8,6 +8,7 @@ import {
   getFloorPlans,
   getFloors,
   getResources,
+  getMyReservations,
   getTeamDeskRecommendations,
   getZones,
   removeFavorite,
@@ -70,7 +71,7 @@ export default function FloorPlan() {
   useEffect(() => {
     if (nearTeam) {
       getTeamDeskRecommendations().then((data) => {
-        setTeamHint(
+      setTeamHint(
           data.team_zone
             ? `Team desks are usually near ${data.team_zone}`
             : 'No team desk history yet, showing a broad set of suggestions',
@@ -137,6 +138,21 @@ export default function FloorPlan() {
     setBooking(true);
     setMessage('');
     try {
+      if (selected.type === 'desk') {
+        const myReservations = await getMyReservations();
+        const alreadyBookedDesk = myReservations.some(
+          (reservation) =>
+            reservation.status === 'active' &&
+            reservation.date === date &&
+            reservation.resource?.type === 'desk',
+        );
+
+        if (alreadyBookedDesk) {
+          setMessage('You can only reserve one desk per day.');
+          return;
+        }
+      }
+
       const startTime = selected.type === 'room' && reservationMode === 'slot' ? roomStartTime : null;
       const endTime = selected.type === 'room' && reservationMode === 'slot' ? roomEndTime : null;
       await createReservation(selected.id, date, startTime, endTime);

@@ -17,6 +17,7 @@ def validate_booking_rules(
     booking_date: date,
     start_time: time | None = None,
     end_time: time | None = None,
+    exclude_reservation_id: int | None = None,
 ):
     today = date.today()
     max_date = today + timedelta(days=settings.max_booking_days_ahead)
@@ -56,19 +57,24 @@ def validate_booking_rules(
                 detail="Desk reservations do not use time slots",
             )
 
-    same_day_count = (
+    same_day_query = (
         db.query(Reservation)
+        .join(Resource)
         .filter(
             Reservation.user_id == user.id,
             Reservation.status == ReservationStatus.active,
             Reservation.date == booking_date,
+            Resource.type == "desk",
         )
-        .count()
     )
+    if exclude_reservation_id is not None:
+        same_day_query = same_day_query.filter(Reservation.id != exclude_reservation_id)
+
+    same_day_count = same_day_query.count()
     if same_day_count >= 1:
         raise HTTPException(
             status_code=400,
-            detail="Only one reservation is allowed per day",
+            detail="Only one desk reservation is allowed per employee per day",
         )
 
 
@@ -133,7 +139,15 @@ def update_reservation(
     start_time: time | None = None,
     end_time: time | None = None,
 ):
-    validate_booking_rules(db, reservation.user, resource_id, booking_date, start_time, end_time)
+    validate_booking_rules(
+        db,
+        reservation.user,
+        resource_id,
+        booking_date,
+        start_time,
+        end_time,
+        exclude_reservation_id=reservation.id,
+    )
 
     existing = (
         db.query(Reservation)

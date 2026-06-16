@@ -11,7 +11,7 @@ import {
 import PageHeader from '../../components/ui/PageHeader';
 
 const emptyPlanForm = {
-  building: 'HQ - New York',
+  building: 'HQ - Prishtina',
   floor: '1',
 };
 
@@ -53,6 +53,10 @@ export default function FloorBuilder() {
   }, [floor]);
 
   const plan = plans.find((item) => item.floor === floor) ?? null;
+  const headerTitle = plan ? `Floor Plan Builder - Floor ${plan.floor}` : 'Floor Plan Builder';
+  const headerSubtitle = plan
+    ? `Upload, rename, replace, and manage the ${plan.building} floor plan while positioning resources`
+    : 'Upload, rename, replace, and manage HQ floor plans while positioning resources';
 
   useEffect(() => {
     if (editingPlanId) return;
@@ -104,7 +108,7 @@ export default function FloorBuilder() {
     setSavingPlan(true);
     setMessage('');
     try {
-      const uploaded = await uploadFloorPlan(planForm.floor.trim(), file, planForm.building.trim() || 'HQ - New York');
+      const uploaded = await uploadFloorPlan(planForm.floor.trim(), file, planForm.building.trim() || 'HQ - Prishtina');
       setPlans((prev) => {
         const rest = prev.filter((item) => item.id !== uploaded.id && item.floor !== uploaded.floor);
         return [...rest, uploaded].sort((a, b) => a.floor.localeCompare(b.floor, undefined, { numeric: true }));
@@ -127,7 +131,7 @@ export default function FloorBuilder() {
     setMessage('');
     try {
       const updated = await updateFloorPlan(editingPlanId, {
-        building: planForm.building.trim() || 'HQ - New York',
+        building: planForm.building.trim() || 'HQ - Prishtina',
         floor: planForm.floor.trim(),
       });
       const sorted = await reloadPlans();
@@ -200,8 +204,8 @@ export default function FloorBuilder() {
   return (
     <div>
       <PageHeader
-        title="Floor Plan Builder"
-        subtitle="Upload, rename, replace, and manage HQ floor plans while positioning resources"
+        title={headerTitle}
+        subtitle={headerSubtitle}
       />
 
       {message && (

@@ -50,8 +50,8 @@ def startup():
             resource_cols = conn.execute(text("PRAGMA table_info(resources)")).fetchall()
             resource_col_names = {c[1] for c in resource_cols}
             if "building" not in resource_col_names:
-                conn.execute(text("ALTER TABLE resources ADD COLUMN building VARCHAR(120) DEFAULT 'HQ - New York'"))
-                conn.execute(text("UPDATE resources SET building = 'HQ - New York' WHERE building IS NULL"))
+                conn.execute(text("ALTER TABLE resources ADD COLUMN building VARCHAR(120) DEFAULT 'HQ - Prishtina'"))
+                conn.execute(text("UPDATE resources SET building = 'HQ - Prishtina' WHERE building IS NULL"))
 
             floor_plan_cols = conn.execute(text("PRAGMA table_info(floor_plans)")).fetchall()
             floor_plan_col_names = {c[1] for c in floor_plan_cols}

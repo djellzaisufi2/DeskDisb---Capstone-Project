@@ -38,7 +38,7 @@ const CUSTOM_VALUE = '__custom__';
 const emptyForm = {
   name: '',
   type: 'desk',
-  building: 'HQ - New York',
+  building: 'HQ - Prishtina',
   floor: '',
   zone: 'Open Area',
   capacity: 1,
@@ -104,22 +104,6 @@ export default function Resources() {
 
   const load = () => getResources().then(setResources);
 
-  useEffect(() => {
-    load();
-    getFloorPlans().then(setFloorPlans);
-  }, []);
-
-  useEffect(() => {
-    if (!showForm || form.floor || floorOptions.length === 0) return;
-    const defaultFloor = floorOptions[0];
-    const matchingPlan = floorPlans.find((plan) => plan.floor === defaultFloor);
-    setForm((current) => ({
-      ...current,
-      floor: defaultFloor,
-      building: matchingPlan?.building ?? current.building,
-    }));
-  }, [showForm, form.floor, floorOptions, floorPlans]);
-
   const buildingOptions = useMemo(
     () => [...new Set(floorPlans.map((plan) => plan.building).filter(Boolean))].sort(),
     [floorPlans],
@@ -148,6 +132,22 @@ export default function Resources() {
     () => floorPlans.find((plan) => plan.floor === form.floor) ?? null,
     [floorPlans, form.floor],
   );
+
+  useEffect(() => {
+    load();
+    getFloorPlans().then(setFloorPlans);
+  }, []);
+
+  useEffect(() => {
+    if (!showForm || form.floor || floorOptions.length === 0) return;
+    const defaultFloor = floorOptions[0];
+    const matchingPlan = floorPlans.find((plan) => plan.floor === defaultFloor);
+    setForm((current) => ({
+      ...current,
+      floor: defaultFloor,
+      building: matchingPlan?.building ?? current.building,
+    }));
+  }, [showForm, form.floor, floorOptions, floorPlans]);
 
   const visibleResources = resources.filter((resource) => {
     if (filterBuilding && resource.building !== filterBuilding) return false;
@@ -188,7 +188,7 @@ export default function Resources() {
     setForm({
       name: resource.name,
       type: resource.type,
-      building: resource.building ?? 'HQ - New York',
+      building: resource.building ?? 'HQ - Prishtina',
       floor: resource.floor,
       zone: resource.zone,
       capacity: resource.capacity,
@@ -219,7 +219,7 @@ export default function Resources() {
               setForm({
                 ...emptyForm,
                 floor: floorOptions[0] ?? '',
-                building: buildingOptions[0] ?? 'HQ - New York',
+                building: buildingOptions[0] ?? 'HQ - Prishtina',
               });
             }}
             className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
@@ -410,7 +410,7 @@ export default function Resources() {
                 setForm({
                   ...emptyForm,
                   floor: floorOptions[0] ?? '',
-                  building: buildingOptions[0] ?? 'HQ - New York',
+                  building: buildingOptions[0] ?? 'HQ - Prishtina',
                 });
               }}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
@@ -439,7 +439,7 @@ export default function Resources() {
               <tr key={resource.id} className="border-b border-slate-100">
                 <td className="px-4 py-3 font-medium">{resource.name}</td>
                 <td className="px-4 py-3 capitalize">{resource.type}</td>
-                <td className="px-4 py-3">{resource.building ?? 'HQ - New York'}</td>
+                <td className="px-4 py-3">{resource.building ?? 'HQ - Prishtina'}</td>
                 <td className="px-4 py-3">{resource.floor}</td>
                 <td className="px-4 py-3">{resource.zone}</td>
                 <td className="px-4 py-3">{resource.desk_type ?? '-'}</td>
