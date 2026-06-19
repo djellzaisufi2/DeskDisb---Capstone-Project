@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -9,7 +10,12 @@ from app.database import Base, engine
 from app.models import AuditLog, Favorite, FloorPlan, Reservation, Resource, User
 from app.routers import analytics, audit, auth, floor_plans, reservations, resources, users
 
-os.makedirs(settings.upload_dir, exist_ok=True)
+logger = logging.getLogger(__name__)
+
+try:
+    os.makedirs(settings.upload_dir, exist_ok=True)
+except OSError as exc:
+    logger.warning("Upload directory unavailable: %s", exc)
 
 app = FastAPI(title="DeskDibs API", version="1.0.0")
 
@@ -31,9 +37,17 @@ app.include_router(users.router, prefix="/api")
 
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
-    if engine.dialect.name == "sqlite":
-        with engine.begin() as conn:
+    if not settings.database_configured:
+        logger.warning("DATABASE_URL is not configured for production")
+        return
+
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.exception("Database initialization failed: %s", exc)
+        return
+
+    if engine.dialect.name == "sqlite":        with engine.begin() as conn:
             user_cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
             user_col_names = {c[1] for c in user_cols}
             if "team_name" not in user_col_names:
@@ -79,4 +93,7 @@ def startup():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "database_configured": settings.database_configured,
+    }
