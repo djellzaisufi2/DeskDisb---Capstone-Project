@@ -92,6 +92,15 @@ def startup():
                         )
 
 
+@app.get("/")
+def root():
+    return {
+        "name": "DeskDibs API",
+        "health": "/api/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/api/health")
 def health():
     return {
