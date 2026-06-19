@@ -1,6 +1,15 @@
 import axios from 'axios';
 
-const apiBaseURL = import.meta.env.VITE_API_URL?.trim() || '/api';
+function resolveApiBaseUrl() {
+  const fromEnv = import.meta.env.VITE_API_URL?.trim();
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')) {
+    return 'https://deskdibs-backend.vercel.app/api';
+  }
+  return '/api';
+}
+
+const apiBaseURL = resolveApiBaseUrl();
 const api = axios.create({ baseURL: apiBaseURL });
 
 api.interceptors.request.use((config) => {
