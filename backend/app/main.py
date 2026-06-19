@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
-from app.models import Favorite, FloorPlan, Reservation, Resource, User
-from app.routers import analytics, auth, floor_plans, reservations, resources, users
+from app.models import AuditLog, Favorite, FloorPlan, Reservation, Resource, User
+from app.routers import analytics, audit, auth, floor_plans, reservations, resources, users
 
 os.makedirs(settings.upload_dir, exist_ok=True)
 
@@ -26,6 +26,7 @@ app.include_router(resources.router, prefix="/api")
 app.include_router(reservations.router, prefix="/api")
 app.include_router(floor_plans.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 
 @app.on_event("startup")

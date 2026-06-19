@@ -14,6 +14,8 @@ from app.auth import (
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import PasswordResetRequest, Token, UserCreate, UserOut
+from app.utils.email_validation import normalize_email, validate_allowed_email
+from app.services.audit import record_audit
 from app.services.notifications import (
     build_reset_link,
     generate_reset_token,
@@ -31,13 +33,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    email = normalize_email(form_data.username)
+    validate_allowed_email(email)
+    user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    token = create_access_token({"sub": str(user.id)})
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return Token(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -46,19 +50,26 @@ def me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@router.post("/refresh", response_model=Token)
+def refresh_token(current_user: User = Depends(get_current_user)):
+    token = create_access_token({"sub": str(current_user.id), "role": current_user.role.value})
+    return Token(access_token=token, user=UserOut.model_validate(current_user))
+
+
 @router.post("/register", response_model=UserOut)
 def register(
     data: UserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    admin_user: User = Depends(require_admin),
 ):
-    if db.query(User).filter(User.email == data.email).first():
+    email = normalize_email(data.email)
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     temporary_password = generate_temporary_password()
     reset_token = generate_reset_token()
     user = User(
-        email=data.email,
+        email=email,
         hashed_password=hash_password(temporary_password),
         full_name=data.full_name,
         role=data.role,
@@ -72,6 +83,16 @@ def register(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    record_audit(
+        db,
+        admin_user,
+        "create_user",
+        "user",
+        user.id,
+        f"Created {user.email} as {user.role.value}",
+    )
+    db.commit()
 
     send_email(
         user.email,

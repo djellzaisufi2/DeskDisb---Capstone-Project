@@ -77,6 +77,43 @@ def validate_booking_rules(
             detail="Only one desk reservation is allowed per employee per day",
         )
 
+    active_query = db.query(Reservation).filter(
+        Reservation.user_id == user.id,
+        Reservation.status == ReservationStatus.active,
+        Reservation.date >= today,
+    )
+    if exclude_reservation_id is not None:
+        active_query = active_query.filter(Reservation.id != exclude_reservation_id)
+
+    active_count = active_query.count()
+    if active_count >= settings.max_active_reservations:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Maximum {settings.max_active_reservations} active reservations allowed. "
+                "Cancel an existing booking first."
+            ),
+        )
+
+
+def get_booking_limits(db: Session, user: User) -> dict:
+    today = date.today()
+    active_count = (
+        db.query(Reservation)
+        .filter(
+            Reservation.user_id == user.id,
+            Reservation.status == ReservationStatus.active,
+            Reservation.date >= today,
+        )
+        .count()
+    )
+    return {
+        "max_active_reservations": settings.max_active_reservations,
+        "max_booking_days_ahead": settings.max_booking_days_ahead,
+        "active_reservations": active_count,
+        "remaining_slots": max(0, settings.max_active_reservations - active_count),
+    }
+
 
 def create_reservation(
     db: Session,
