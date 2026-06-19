@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
 import { Calendar, Filter, Layers, LocateFixed } from 'lucide-react';
 import {
@@ -505,7 +505,12 @@ export default function FloorPlan() {
                 </select>
               </div>
               {teamMembers.length === 0 ? (
-                <p className="text-sm text-slate-500">No team members found for your account.</p>
+                <div className="space-y-3 text-sm text-slate-500">
+                  <p>No team members are assigned yet.</p>
+                  <Link to="/team" className="font-medium text-brand-600 hover:text-brand-700">
+                    Go to My Team to add employees
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {teamMembers.map((member) => (

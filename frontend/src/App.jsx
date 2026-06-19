@@ -12,6 +12,8 @@ import Resources from './pages/admin/Resources';
 import FloorBuilder from './pages/admin/FloorBuilder';
 import Analytics from './pages/admin/Analytics';
 import Users from './pages/admin/Users';
+import AuditLog from './pages/admin/AuditLog';
+import TeamSettings from './pages/TeamSettings';
 import ResetPassword from './pages/ResetPassword';
 
 export default function App() {
@@ -31,6 +33,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="reservations" element={<Reservations />} />
             <Route path="floor-plan" element={<FloorPlan />} />
+            <Route path="team" element={<TeamSettings />} />
             <Route
               path="admin"
               element={
@@ -76,6 +79,14 @@ export default function App() {
               element={
                 <AdminRoute>
                   <Users />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/audit"
+              element={
+                <AdminRoute>
+                  <AuditLog />
                 </AdminRoute>
               }
             />

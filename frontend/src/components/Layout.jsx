@@ -32,6 +32,7 @@ const adminLinks = [
   { to: '/admin/builder', icon: Map, label: 'Floor Builder' },
   { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/admin/users', icon: Users, label: 'Users' },
+  { to: '/admin/audit', icon: Users, label: 'Audit Log' },
 ];
 
 export default function Layout() {
@@ -143,6 +144,22 @@ export default function Layout() {
               {label}
             </NavLink>
           ))}
+
+          {user?.role === 'team_leader' && (
+            <NavLink
+              to="/team"
+              className={({ isActive }) =>
+                `mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-brand-600 text-white shadow-md'
+                    : 'text-brand-100 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <Users size={18} strokeWidth={1.75} />
+              My Team
+            </NavLink>
+          )}
 
           {isManager && !isAdmin && (
             <>

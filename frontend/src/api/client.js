@@ -140,8 +140,37 @@ export async function getEmployeeSummary() {
   return data;
 }
 
-export async function getAnalyticsDashboard() {
-  const { data } = await api.get('/analytics/dashboard');
+export async function getAnalyticsDashboard(days = 30) {
+  const { data } = await api.get('/analytics/dashboard', { params: { days } });
+  return data;
+}
+
+export async function downloadAnalyticsCsv(days = 30) {
+  const { data } = await api.get('/analytics/export', {
+    params: { days },
+    responseType: 'blob',
+  });
+  return data;
+}
+
+export async function getBookingLimits() {
+  const { data } = await api.get('/reservations/limits');
+  return data;
+}
+
+export async function getAuditLogs() {
+  const { data } = await api.get('/audit-logs');
+  return data;
+}
+
+export async function refreshAuthToken() {
+  const { data } = await api.post('/auth/refresh');
+  localStorage.setItem('token', data.access_token);
+  return data;
+}
+
+export async function downloadUsersCsv() {
+  const { data } = await api.get('/users/export', { responseType: 'blob' });
   return data;
 }
 
@@ -160,6 +189,19 @@ export async function getTeamMembers() {
   return data;
 }
 
+export async function getAvailableForTeam() {
+  const { data } = await api.get('/users/available-for-team');
+  return data;
+}
+
+export async function updateMyTeam(teamName, teammateIds) {
+  const { data } = await api.put('/users/me/team', {
+    team_name: teamName,
+    teammate_ids: teammateIds,
+  });
+  return data;
+}
+
 export async function searchWorkspace(query) {
   const { data } = await api.get('/users/search', {
     params: { q: query },
@@ -167,8 +209,11 @@ export async function searchWorkspace(query) {
   return data;
 }
 
-export async function assignTeamMembers(leaderId, teammateIds) {
-  const { data } = await api.post(`/users/${leaderId}/team`, { teammate_ids: teammateIds });
+export async function assignTeamMembers(leaderId, teammateIds, teamName) {
+  const { data } = await api.post(`/users/${leaderId}/team`, {
+    teammate_ids: teammateIds,
+    team_name: teamName,
+  });
   return data;
 }
 
