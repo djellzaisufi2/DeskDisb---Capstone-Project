@@ -47,7 +47,8 @@ def startup():
         logger.exception("Database initialization failed: %s", exc)
         return
 
-    if engine.dialect.name == "sqlite":        with engine.begin() as conn:
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as conn:
             user_cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
             user_col_names = {c[1] for c in user_cols}
             if "team_name" not in user_col_names:
