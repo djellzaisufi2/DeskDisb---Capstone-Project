@@ -4,9 +4,9 @@ import {
   getAvailableForTeam,
   getTeamMembers,
   updateMyTeam,
-} from '../../api/client';
-import PageHeader from '../../components/ui/PageHeader';
-import { useAuth } from '../../context/AuthContext';
+} from '../api/client';
+import PageHeader from '../components/ui/PageHeader';
+import { useAuth } from '../context/AuthContext';
 
 const TEAM_NAMES = ['Product', 'Operations', 'Platform', 'Engineering', 'Design'];
 
