@@ -69,8 +69,8 @@ export default function ResourceDetailsModal({
   }, [desk.is_available, selectedDate]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="grid max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl lg:grid-cols-[1.1fr_0.9fr]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
+      <div className="grid max-h-[92vh] w-full overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:max-w-5xl sm:rounded-2xl lg:grid-cols-[1.1fr_0.9fr]">
         <div className="border-b border-slate-200 bg-slate-50 lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <button
@@ -94,7 +94,7 @@ export default function ResourceDetailsModal({
             <img
               src={image}
               alt={desk.name}
-              className="h-64 w-full rounded-xl border border-slate-200 object-cover lg:h-[420px]"
+              className="h-48 w-full rounded-xl border border-slate-200 object-cover sm:h-64 lg:h-[420px]"
             />
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-white p-3">
@@ -122,7 +122,7 @@ export default function ResourceDetailsModal({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm text-slate-500">{desk.desk_type ?? getLabelForType(desk.type)}</p>
-              <h2 className="text-3xl font-bold text-slate-900">{desk.name}</h2>
+              <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{desk.name}</h2>
             </div>
             <span className={desk.is_available ? 'badge-green' : 'badge-red'}>
               {desk.is_available ? 'Available' : 'Reserved'}

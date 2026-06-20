@@ -13,7 +13,7 @@ from app.auth import (
 )
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import PasswordResetRequest, Token, UserCreate, UserOut
+from app.schemas.auth import PasswordResetRequest, Token, UserCreate, UserCreateResponse, UserOut
 from app.utils.email_validation import normalize_email, validate_allowed_email
 from app.services.audit import record_audit
 from app.services.notifications import (
@@ -56,13 +56,14 @@ def refresh_token(current_user: User = Depends(get_current_user)):
     return Token(access_token=token, user=UserOut.model_validate(current_user))
 
 
-@router.post("/register", response_model=UserOut)
+@router.post("/register", response_model=UserCreateResponse)
 def register(
     data: UserCreate,
     db: Session = Depends(get_db),
     admin_user: User = Depends(require_admin),
 ):
     email = normalize_email(data.email)
+    validate_allowed_email(email)
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -110,7 +111,9 @@ def register(
             ]
         ),
     )
-    return user
+    return UserCreateResponse.model_validate(user).model_copy(
+        update={"temporary_password": temporary_password}
+    )
 
 
 @router.post("/reset-password")

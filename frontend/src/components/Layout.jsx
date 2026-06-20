@@ -9,8 +9,10 @@ import {
   LayoutDashboard,
   LogOut,
   Map,
+  Menu,
   Search,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getRecentActivity, searchWorkspace } from '../api/client';
@@ -44,6 +46,7 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState({ resources: [], users: [] });
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     getRecentActivity().then(setRecentActivity).catch(() => setRecentActivity([]));
@@ -84,6 +87,10 @@ export default function Layout() {
     return () => window.clearTimeout(timeoutId);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -108,10 +115,17 @@ export default function Layout() {
   const hasSearchResults =
     searchResults.resources.length > 0 || searchResults.users.length > 0;
 
-  return (
-    <div className="flex min-h-screen bg-surface">
-      <aside className="flex w-[260px] shrink-0 flex-col bg-brand-900 text-white">
-        <div className="border-b border-white/10 px-6 py-5">
+  const navLinkClass = ({ isActive }) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+      isActive
+        ? 'bg-brand-600 text-white shadow-md'
+        : 'text-brand-100 hover:bg-white/10 hover:text-white'
+    }`;
+
+  const sidebar = (
+    <>
+      <div className="border-b border-white/10 px-6 py-5">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold shadow-lg">
               D
@@ -121,122 +135,133 @@ export default function Layout() {
               <p className="text-[11px] text-brand-200">Hot-desking platform</p>
             </div>
           </div>
-        </div>
-
-        <nav className="flex-1 space-y-1 p-4">
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
-            Workspace
-          </p>
-          {employeeLinks.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-brand-600 text-white shadow-md'
-                    : 'text-brand-100 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              <Icon size={18} strokeWidth={1.75} />
-              {label}
-            </NavLink>
-          ))}
-
-          {user?.role === 'team_leader' && (
-            <NavLink
-              to="/team"
-              className={({ isActive }) =>
-                `mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-brand-600 text-white shadow-md'
-                    : 'text-brand-100 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              <Users size={18} strokeWidth={1.75} />
-              My Team
-            </NavLink>
-          )}
-
-          {isManager && !isAdmin && (
-            <>
-              <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
-                Management
-              </p>
-              {managerLinks.map(({ to, icon: Icon, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-brand-600 text-white shadow-md'
-                        : 'text-brand-100 hover:bg-white/10 hover:text-white'
-                    }`
-                  }
-                >
-                  <Icon size={18} strokeWidth={1.75} />
-                  {label}
-                </NavLink>
-              ))}
-            </>
-          )}
-
-          {isAdmin && (
-            <>
-              <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
-                Administration
-              </p>
-              {adminLinks.map(({ to, icon: Icon, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === '/admin'}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-brand-600 text-white shadow-md'
-                        : 'text-brand-100 hover:bg-white/10 hover:text-white'
-                    }`
-                  }
-                >
-                  <Icon size={18} strokeWidth={1.75} />
-                  {label}
-                </NavLink>
-              ))}
-            </>
-          )}
-        </nav>
-
-        <div className="border-t border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold">
-              {user?.full_name?.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{user?.full_name}</p>
-              <p className="truncate text-xs text-brand-300">
-                {user?.job_title ?? user?.role}
-              </p>
-            </div>
-          </div>
           <button
             type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-brand-200 transition hover:bg-white/10 hover:text-white"
+            onClick={() => setMobileNavOpen(false)}
+            className="rounded-lg p-2 text-brand-100 hover:bg-white/10 lg:hidden"
+            aria-label="Close menu"
           >
-            <LogOut size={18} />
-            Sign out
+            <X size={18} />
           </button>
         </div>
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
+          Workspace
+        </p>
+        {employeeLinks.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={navLinkClass}
+          >
+            <Icon size={18} strokeWidth={1.75} />
+            {label}
+          </NavLink>
+        ))}
+
+        {user?.role === 'team_leader' && (
+          <NavLink to="/team" className={navLinkClass}>
+            <Users size={18} strokeWidth={1.75} />
+            My Team
+          </NavLink>
+        )}
+
+        {isManager && !isAdmin && (
+          <>
+            <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
+              Management
+            </p>
+            {managerLinks.map(({ to, icon: Icon, label }) => (
+              <NavLink key={to} to={to} className={navLinkClass}>
+                <Icon size={18} strokeWidth={1.75} />
+                {label}
+              </NavLink>
+            ))}
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-wider text-brand-300">
+              Administration
+            </p>
+            {adminLinks.map(({ to, icon: Icon, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/admin'}
+                className={navLinkClass}
+              >
+                <Icon size={18} strokeWidth={1.75} />
+                {label}
+              </NavLink>
+            ))}
+          </>
+        )}
+      </nav>
+
+      <div className="border-t border-white/10 p-4">
+        <div className="mb-3 flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold">
+            {user?.full_name?.charAt(0)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{user?.full_name}</p>
+            <p className="truncate text-xs text-brand-300">
+              {user?.job_title ?? user?.role}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-brand-200 transition hover:bg-white/10 hover:text-white"
+        >
+          <LogOut size={18} />
+          Sign out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-surface">
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close menu overlay"
+          className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      <aside className="hidden w-[260px] shrink-0 flex-col bg-brand-900 text-white lg:flex">
+        {sidebar}
+      </aside>
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] flex-col bg-brand-900 text-white shadow-2xl transition-transform duration-200 lg:hidden ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {sidebar}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200/80 bg-white px-6 py-3.5 shadow-sm">
-          <div className="relative max-w-md flex-1">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200/80 bg-white px-4 py-3.5 shadow-sm sm:gap-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+
+          <div className="relative min-w-0 flex-1 max-w-md">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -319,10 +344,10 @@ export default function Layout() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:flex"
             >
               <Building2 size={16} className="text-brand-600" />
               HQ - Prishtina
@@ -384,7 +409,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

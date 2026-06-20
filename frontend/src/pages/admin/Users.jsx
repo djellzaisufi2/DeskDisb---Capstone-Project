@@ -81,7 +81,7 @@ export default function Users() {
     }
 
     try {
-      await registerUser({
+      const created = await registerUser({
         email: form.email.trim().toLowerCase(),
         full_name: form.full_name,
         role: form.role,
@@ -96,7 +96,11 @@ export default function Users() {
         team_name: '',
       });
       setShowForm(false);
-      setSuccess('User created. A temporary password email has been sent.');
+      setSuccess(
+        created.temporary_password
+          ? `User created. Temporary password: ${created.temporary_password} (share this with the user if email is not configured).`
+          : 'User created successfully.',
+      );
       load();
     } catch (err) {
       setError(String(err?.response?.data?.detail ?? 'Could not create user.'));
@@ -226,8 +230,8 @@ export default function Users() {
         </form>
       )}
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto">
+        <table className="min-w-[720px] w-full text-sm">
           <thead>
             <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Name</th>
