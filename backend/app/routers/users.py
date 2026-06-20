@@ -10,8 +10,10 @@ from app.models.user import User, UserRole
 from app.schemas.search import SearchResults, SearchResourceResult, SearchUserResult
 from app.services.audit import record_audit
 from app.schemas.team import TeamAssignment, TeamProfileUpdate
-from app.schemas.auth import UserOut
+from app.schemas.auth import UserOut, UserUpdate
 from app.models.resource import Resource
+from app.models.reservation import Reservation
+from app.models.favorite import Favorite
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -250,3 +252,78 @@ def export_users_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=deskdibs-users.csv"},
     )
+
+
+@router.put("/{user_id}", response_model=UserOut)
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if data.full_name is not None:
+        user.full_name = data.full_name
+    if data.role is not None:
+        user.role = data.role
+    if data.job_title is not None:
+        user.job_title = data.job_title
+    if data.team_name is not None:
+        user.team_name = data.team_name
+    if data.team_leader_id is not None:
+        leader = db.get(User, data.team_leader_id)
+        if not leader or leader.role != UserRole.team_leader:
+            raise HTTPException(status_code=400, detail="Invalid team leader")
+        user.team_leader_id = data.team_leader_id
+
+    db.commit()
+    db.refresh(user)
+    record_audit(
+        db,
+        admin_user,
+        "update_user",
+        "user",
+        user.id,
+        f"Updated {user.email}",
+    )
+    db.commit()
+    return user
+
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    email = user.email
+    db.query(User).filter(User.team_leader_id == user.id).update(
+        {User.team_leader_id: None}, synchronize_session=False
+    )
+    db.query(Reservation).filter(Reservation.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(Favorite).filter(Favorite.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.delete(user)
+    record_audit(
+        db,
+        current_user,
+        "delete_user",
+        "user",
+        user_id,
+        f"Deleted {email}",
+    )
+    db.commit()
+    return {"detail": "User deleted"}

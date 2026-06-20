@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   assignTeamMembers,
+  deleteUser,
   downloadUsersCsv,
   getUsers,
   registerUser,
+  updateUser,
 } from '../../api/client';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PageHeader from '../../components/ui/PageHeader';
 import {
   emailDomainHint,
@@ -20,6 +23,14 @@ const ROLE_LABELS = {
 
 const TEAM_NAMES = ['Product', 'Operations', 'Platform', 'Engineering', 'Design'];
 
+const EMPTY_FORM = {
+  email: '',
+  full_name: '',
+  job_title: '',
+  role: 'employee',
+  team_name: '',
+};
+
 function saveBlob(blob, filename) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -31,18 +42,21 @@ function saveBlob(blob, filename) {
 
 export default function Users() {
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({
-    email: '',
-    full_name: '',
-    job_title: '',
-    role: 'employee',
-    team_name: '',
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
   const [teamAssignments, setTeamAssignments] = useState({});
   const [leaderTeamNames, setLeaderTeamNames] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [createdPassword, setCreatedPassword] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const employees = useMemo(
+    () => users.filter((user) => user.role === 'employee'),
+    [users],
+  );
 
   const load = () => getUsers().then((data) => {
     setUsers(data);
@@ -64,46 +78,83 @@ export default function Users() {
     load();
   }, []);
 
-  const employees = useMemo(
-    () => users.filter((user) => user.role === 'employee'),
-    [users],
-  );
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setEditingUserId(null);
+    setShowForm(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setCreatedPassword('');
 
-    const emailError = emailValidationError(form.email);
-    if (emailError) {
-      setError(emailError);
-      return;
+    if (!editingUserId) {
+      const emailError = emailValidationError(form.email);
+      if (emailError) {
+        setError(emailError);
+        return;
+      }
     }
 
     try {
-      const created = await registerUser({
-        email: form.email.trim().toLowerCase(),
-        full_name: form.full_name,
-        role: form.role,
-        job_title: form.job_title || undefined,
-        team_name: form.role === 'team_leader' ? form.team_name || undefined : undefined,
-      });
-      setForm({
-        email: '',
-        full_name: '',
-        job_title: '',
-        role: 'employee',
-        team_name: '',
-      });
-      setShowForm(false);
-      setSuccess(
-        created.temporary_password
-          ? `User created. Temporary password: ${created.temporary_password} (share this with the user if email is not configured).`
-          : 'User created successfully.',
-      );
+      if (editingUserId) {
+        await updateUser(editingUserId, {
+          full_name: form.full_name,
+          role: form.role,
+          job_title: form.job_title || undefined,
+          team_name: form.role === 'team_leader' ? form.team_name || undefined : undefined,
+        });
+        setSuccess('User updated successfully.');
+      } else {
+        const created = await registerUser({
+          email: form.email.trim().toLowerCase(),
+          full_name: form.full_name,
+          role: form.role,
+          job_title: form.job_title || undefined,
+          team_name: form.role === 'team_leader' ? form.team_name || undefined : undefined,
+        });
+        setCreatedPassword(created.temporary_password || '');
+        setSuccess('User created successfully.');
+      }
+      resetForm();
       load();
     } catch (err) {
-      setError(String(err?.response?.data?.detail ?? 'Could not create user.'));
+      setError(String(err?.response?.data?.detail ?? 'Could not save user.'));
+    }
+  };
+
+  const handleEdit = (user) => {
+    setEditingUserId(user.id);
+    setForm({
+      email: user.email,
+      full_name: user.full_name,
+      job_title: user.job_title ?? '',
+      role: user.role,
+      team_name: user.team_name ?? '',
+    });
+    setShowForm(true);
+    setError('');
+    setSuccess('');
+    setCreatedPassword('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteUser(deleteTarget.id);
+      setSuccess(`${deleteTarget.full_name} was deleted.`);
+      if (editingUserId === deleteTarget.id) resetForm();
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      setError(String(err?.response?.data?.detail ?? 'Could not delete user.'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -144,9 +195,9 @@ export default function Users() {
     <div>
       <PageHeader
         title="Users"
-        subtitle="Manage employees, team leaders, managers, and office managers"
+        subtitle="Manage employees and access roles"
         action={(
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={async () => {
@@ -157,7 +208,14 @@ export default function Users() {
             >
               Export CSV
             </button>
-            <button type="button" onClick={() => setShowForm(!showForm)} className="btn-primary">
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+              }}
+              className="btn-primary"
+            >
               Add user
             </button>
           </div>
@@ -172,6 +230,27 @@ export default function Users() {
       {success && (
         <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {success}
+        </div>
+      )}
+
+      {createdPassword && (
+        <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-4 text-sm text-brand-900">
+          <p className="font-semibold">Temporary password</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <code className="rounded-lg bg-white px-3 py-2 text-sm font-semibold tracking-wide text-slate-900 shadow-sm">
+              {createdPassword}
+            </code>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(createdPassword)}
+              className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50"
+            >
+              Copy password
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-brand-700">
+            Share this password with the user if email is not configured.
+          </p>
         </div>
       )}
 
@@ -191,6 +270,7 @@ export default function Users() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             className="input-field"
             required
+            disabled={Boolean(editingUserId)}
           />
           <input
             placeholder="Job title"
@@ -220,18 +300,28 @@ export default function Users() {
               ))}
             </select>
           )}
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500 sm:col-span-2">
-            Only company emails ending with {emailDomainHint()} are allowed.
-            Duplicate emails are blocked automatically.
+          {!editingUserId && (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500 sm:col-span-2">
+              Only company emails ending with {emailDomainHint()} are allowed.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3 sm:col-span-2">
+            <button type="submit" className="btn-primary">
+              {editingUserId ? 'Save changes' : 'Create user'}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-lg border border-slate-200 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
           </div>
-          <button type="submit" className="btn-primary sm:col-span-2">
-            Create user
-          </button>
         </form>
       )}
 
       <div className="card overflow-x-auto">
-        <table className="min-w-[720px] w-full text-sm">
+        <table className="min-w-[860px] w-full text-sm">
           <thead>
             <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Name</th>
@@ -239,6 +329,7 @@ export default function Users() {
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Access</th>
               <th className="px-4 py-3">Team</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -282,9 +373,6 @@ export default function Users() {
                               className="rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                             />
                             <span>{candidate.full_name}</span>
-                            {candidate.team_leader_id && candidate.team_leader_id !== u.id && (
-                              <span className="text-amber-600">(other team)</span>
-                            )}
                           </label>
                         ))}
                       </div>
@@ -297,18 +385,52 @@ export default function Users() {
                       </button>
                     </div>
                   ) : u.team_leader_id ? (
-                    <span className="text-slate-600">
-                      {u.team_name ?? 'Assigned team'}
-                    </span>
+                    <span className="text-slate-600">{u.team_name ?? 'Assigned team'}</span>
                   ) : (
                     <span className="text-slate-400">Unassigned</span>
                   )}
+                </td>
+                <td className="px-4 py-3.5">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(u)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(u)}
+                      disabled={u.email === 'sarah.chen@genpact.com'}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete user?"
+        message={
+          deleteTarget
+            ? `Delete ${deleteTarget.full_name}? This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete user"
+        cancelLabel="Cancel"
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
