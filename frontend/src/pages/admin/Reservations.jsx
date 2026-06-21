@@ -56,25 +56,42 @@ export default function AdminReservations() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    await updateReservation(editing.reservationId, {
-      resource_id: Number(editing.resource_id),
-      date: editing.date,
-      start_time: editing.start_time || null,
-      end_time: editing.end_time || null,
-    });
-    setEditing(emptyForm);
-    load();
+    setError('');
+    setMessage('');
+    setBusyReservationId(editing.reservationId);
+    try {
+      await updateReservation(editing.reservationId, {
+        resource_id: Number(editing.resource_id),
+        date: editing.date,
+        start_time: editing.start_time || null,
+        end_time: editing.end_time || null,
+      });
+      setEditing(emptyForm);
+      setMessage('Reservation updated.');
+      await load();
+    } catch (err) {
+      setError(formatApiError(err, 'Could not update reservation.'));
+    } finally {
+      setBusyReservationId(null);
+    }
   };
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
+    setError('');
+    setMessage('');
     setCancelling(true);
+    setBusyReservationId(cancelTarget.id);
     try {
       await cancelReservation(cancelTarget.id);
+      setMessage('Reservation cancelled.');
       setCancelTarget(null);
       await load();
+    } catch (err) {
+      setError(formatApiError(err, 'Could not cancel reservation.'));
     } finally {
       setCancelling(false);
+      setBusyReservationId(null);
     }
   };
 
@@ -189,7 +206,8 @@ export default function AdminReservations() {
                     <button
                       type="button"
                       onClick={() => startEdit(reservation)}
-                      disabled={busyReservationId === reservation.id || reservation.status !== 'active'}`r`n                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={busyReservationId === reservation.id || reservation.status !== 'active'}
+                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Pencil size={15} />
                       Edit
@@ -197,7 +215,8 @@ export default function AdminReservations() {
                     <button
                       type="button"
                       onClick={() => setCancelTarget(reservation)}
-                      className="inline-flex items-center gap-1 text-red-600 hover:text-red-700"
+                      disabled={busyReservationId === reservation.id || reservation.status !== 'active'}
+                      className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <XCircle size={15} />
                       {busyReservationId === reservation.id ? 'Cancelling...' : 'Cancel'}
