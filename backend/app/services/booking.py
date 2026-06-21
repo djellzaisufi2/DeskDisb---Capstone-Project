@@ -55,21 +55,13 @@ def validate_booking_rules(
         resource_id,
         booking_date,
     )
-    if active_on_resource:
-        if active_on_resource.user_id == user.id and (
-            exclude_reservation_id is None or active_on_resource.id != exclude_reservation_id
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="You already reserved this resource for the selected date",
-            )
-        if active_on_resource.user_id != user.id and (
-            exclude_reservation_id is None or active_on_resource.id != exclude_reservation_id
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="This resource is already booked for the selected date",
-            )
+    if active_on_resource and (
+        exclude_reservation_id is None or active_on_resource.id != exclude_reservation_id
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This resource is already booked for the selected date",
+        )
 
     if resource.type == "room" and user.role not in (UserRole.team_leader, UserRole.manager):
         raise HTTPException(
@@ -160,34 +152,11 @@ def create_reservation(
     start_time: time | None = None,
     end_time: time | None = None,
 ) -> Reservation:
-    inactive_existing = (
-        db.query(Reservation)
-        .filter(
-            Reservation.resource_id == resource_id,
-            Reservation.date == booking_date,
-            Reservation.status != ReservationStatus.active,
-        )
-        .first()
-    )
-    validate_booking_rules(db, user, resource_id, booking_date, start_time, end_time)
-
     active_on_resource = active_reservation_for_resource(db, resource_id, booking_date)
-    if active_on_resource:
-        if active_on_resource.user_id == user.id:
-            return active_on_resource
-        raise HTTPException(
-            status_code=409,
-            detail="This resource is already booked for the selected date",
-        )
+    if active_on_resource and active_on_resource.user_id == user.id:
+        return active_on_resource
 
-    if inactive_existing:
-        inactive_existing.user_id = user.id
-        inactive_existing.status = ReservationStatus.active
-        inactive_existing.start_time = start_time
-        inactive_existing.end_time = end_time
-        db.commit()
-        db.refresh(inactive_existing)
-        return inactive_existing
+    validate_booking_rules(db, user, resource_id, booking_date, start_time, end_time)
 
     existing = (
         db.query(Reservation)
@@ -198,6 +167,13 @@ def create_reservation(
         .first()
     )
     if existing:
+        if existing.status == ReservationStatus.active:
+            if existing.user_id == user.id:
+                return existing
+            raise HTTPException(
+                status_code=409,
+                detail="This resource is already booked for the selected date",
+            )
         existing.user_id = user.id
         existing.status = ReservationStatus.active
         existing.start_time = start_time
@@ -219,10 +195,27 @@ def create_reservation(
         db.commit()
     except IntegrityError:
         db.rollback()
+        existing = (
+            db.query(Reservation)
+            .filter(
+                Reservation.resource_id == resource_id,
+                Reservation.date == booking_date,
+            )
+            .first()
+        )
+        if existing and existing.status != ReservationStatus.active:
+            existing.user_id = user.id
+            existing.status = ReservationStatus.active
+            existing.start_time = start_time
+            existing.end_time = end_time
+            db.commit()
+            db.refresh(existing)
+            return existing
+        if existing and existing.user_id == user.id:
+            return existing
         raise HTTPException(status_code=409, detail="This resource is already booked for the selected date")
     db.refresh(reservation)
     return reservation
-
 
 def create_recurring_reservations(
     db: Session,

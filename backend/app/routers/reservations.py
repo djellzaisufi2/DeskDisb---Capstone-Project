@@ -175,15 +175,19 @@ def cancel(
     reservation = cancel_reservation(db, reservation, current_user, is_admin)
     if is_admin:
         _notify_user_reservation_cancelled(reservation)
-        record_audit(
-            db,
-            current_user,
-            "cancel_reservation",
-            "reservation",
-            reservation.id,
-            f"Cancelled booking for {reservation.user.full_name if reservation.user else 'user'}",
-        )
-        db.commit()
+        try:
+            record_audit(
+                db,
+                current_user,
+                "cancel_reservation",
+                "reservation",
+                reservation.id,
+                f"Cancelled booking for {reservation.user.full_name if reservation.user else 'user'}",
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            print(f"[audit:error] action=cancel_reservation reservation_id={reservation.id} error={exc}")
     return _to_out(reservation)
 
 
