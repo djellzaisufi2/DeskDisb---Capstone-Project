@@ -3,12 +3,14 @@ import { format, isAfter, isBefore, parseISO, startOfToday } from 'date-fns';
 import { CalendarX, CheckCircle2, Clock, History } from 'lucide-react';
 import { cancelReservation, getBookingLimits, getMyReservations } from '../api/client';
 import MiniCalendar from '../components/MiniCalendar';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import KpiCard from '../components/ui/KpiCard';
 import PageHeader from '../components/ui/PageHeader';
 
 export default function ReservationsPage() {
   const [reservations, setReservations] = useState([]);
   const [cancelling, setCancelling] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [limits, setLimits] = useState(null);
 
   const load = () => getMyReservations().then(setReservations);
@@ -31,11 +33,12 @@ export default function ReservationsPage() {
     .filter((r) => r.status === 'active')
     .map((r) => r.date);
 
-  const handleCancel = async (id) => {
-    if (!confirm('Cancel this reservation? The desk will become available immediately.')) return;
-    setCancelling(id);
+  const handleCancelConfirm = async () => {
+    if (!cancelTarget) return;
+    setCancelling(cancelTarget.id);
     try {
-      await cancelReservation(id);
+      await cancelReservation(cancelTarget.id);
+      setCancelTarget(null);
       await load();
     } finally {
       setCancelling(null);
@@ -97,7 +100,7 @@ export default function ReservationsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCancel(r.id)}
+                  onClick={() => setCancelTarget(r)}
                   disabled={cancelling === r.id}
                   className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                 >
@@ -149,6 +152,23 @@ export default function ReservationsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(cancelTarget)}
+        title="Cancel reservation?"
+        message={
+          cancelTarget
+            ? `${cancelTarget.resource?.name ?? 'This resource'} on ${cancelTarget.date} will be released and become available for other employees.`
+            : ''
+        }
+        confirmLabel="Cancel reservation"
+        cancelLabel="Keep reservation"
+        loading={Boolean(cancelling)}
+        onConfirm={handleCancelConfirm}
+        onCancel={() => {
+          if (!cancelling) setCancelTarget(null);
+        }}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   updateReservation,
 } from '../../api/client';
 import PageHeader from '../../components/ui/PageHeader';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const emptyForm = {
   reservationId: null,
@@ -21,6 +22,11 @@ export default function AdminReservations() {
   const [resources, setResources] = useState([]);
   const [filterDate, setFilterDate] = useState('');
   const [editing, setEditing] = useState(emptyForm);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [busyReservationId, setBusyReservationId] = useState(null);
 
   const load = async () => {
     const [reservationData, resourceData] = await Promise.all([
@@ -30,6 +36,9 @@ export default function AdminReservations() {
     setReservations(reservationData);
     setResources(resourceData);
   };
+
+  const formatApiError = (err, fallback) =>
+    String(err?.response?.data?.detail ?? err?.message ?? fallback);
 
   useEffect(() => {
     load();
@@ -57,10 +66,16 @@ export default function AdminReservations() {
     load();
   };
 
-  const handleCancel = async (reservationId) => {
-    if (!confirm('Cancel this reservation?')) return;
-    await cancelReservation(reservationId);
-    load();
+  const handleCancelConfirm = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await cancelReservation(cancelTarget.id);
+      setCancelTarget(null);
+      await load();
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -82,6 +97,17 @@ export default function AdminReservations() {
           </div>
         }
       />
+
+      {message && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
 
       {editing.reservationId && (
         <form onSubmit={handleSave} className="card mb-6 grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -118,8 +144,8 @@ export default function AdminReservations() {
             className="input-field"
           />
           <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-            <button type="submit" className="btn-primary">
-              Save reservation
+            <button type="submit" disabled={busyReservationId === editing.reservationId} className="btn-primary">
+              {busyReservationId === editing.reservationId ? 'Saving...' : 'Save reservation'}
             </button>
             <button type="button" onClick={() => setEditing(emptyForm)} className="btn-secondary">
               Cancel
@@ -163,18 +189,18 @@ export default function AdminReservations() {
                     <button
                       type="button"
                       onClick={() => startEdit(reservation)}
-                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700"
+                      disabled={busyReservationId === reservation.id || reservation.status !== 'active'}`r`n                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Pencil size={15} />
                       Edit
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleCancel(reservation.id)}
+                      onClick={() => setCancelTarget(reservation)}
                       className="inline-flex items-center gap-1 text-red-600 hover:text-red-700"
                     >
                       <XCircle size={15} />
-                      Cancel
+                      {busyReservationId === reservation.id ? 'Cancelling...' : 'Cancel'}
                     </button>
                   </div>
                 </td>
@@ -183,6 +209,23 @@ export default function AdminReservations() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(cancelTarget)}
+        title="Cancel reservation?"
+        message={
+          cancelTarget
+            ? `${cancelTarget.user_name}'s ${cancelTarget.resource?.name ?? 'reservation'} for ${cancelTarget.date} will be cancelled and the resource will become available again.`
+            : ''
+        }
+        confirmLabel="Cancel reservation"
+        cancelLabel="Keep reservation"
+        loading={cancelling}
+        onConfirm={handleCancelConfirm}
+        onCancel={() => {
+          if (!cancelling) setCancelTarget(null);
+        }}
+      />
     </div>
   );
 }
