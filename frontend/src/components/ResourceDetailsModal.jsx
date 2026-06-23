@@ -37,6 +37,7 @@ const DETAIL_AMENITIES = {
 
 function getLabelForType(type) {
   if (type === 'room') return 'Meeting Room';
+  if (type === 'amenity') return 'Amenity';
   return 'Desk';
 }
 
@@ -48,6 +49,7 @@ export default function ResourceDetailsModal({
   onToggleFavorite,
   favoriteBusy,
   booking,
+  canReserveTeamLeaderOnly = true,
 }) {
   const image =
     DESK_IMAGES[desk.desk_type ?? ''] ?? DESK_IMAGES.default;
@@ -57,6 +59,9 @@ export default function ResourceDetailsModal({
     : desk.zone === 'Quiet Zone'
       ? 'Focus work, individual tasks'
       : 'Collaboration, hybrid workdays';
+  const isTeamLeaderOnly = Boolean(desk.restricted_to_team_leaders);
+  const isAmenity = desk.type === 'amenity';
+  const isReservedConflict = desk.type !== 'room' && isResourceReservedByOther(desk);
 
   const nextAvailable = useMemo(() => {
     if (isResourceAvailable(desk)) {
@@ -79,7 +84,7 @@ export default function ResourceDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center overscroll-contain bg-slate-900/50 p-0 sm:items-center sm:p-4">
-      <div className="h-[100dvh] w-full overflow-y-auto overscroll-contain bg-white shadow-2xl sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-2xl lg:grid lg:grid-cols-[1.1fr_0.9fr] lg:overflow-hidden">
+      <div className="h-[100dvh] w-full overflow-y-auto overscroll-contain bg-white shadow-2xl sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-2xl lg:grid lg:h-[90vh] lg:grid-cols-[1.1fr_0.9fr] lg:overflow-hidden">
         <div className="relative z-0 min-h-0 border-b border-slate-200 bg-slate-50 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4 lg:static lg:bg-transparent">
             <button
@@ -133,10 +138,32 @@ export default function ResourceDetailsModal({
               <p className="text-sm text-slate-500">{desk.desk_type ?? getLabelForType(desk.type)}</p>
               <h2 className="break-words text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{desk.name}</h2>
             </div>
-            <span className={`${isResourceAvailable(desk) ? 'badge-green' : 'badge-red'} self-start shrink-0 whitespace-nowrap`}>
-              {isResourceAvailable(desk) ? 'Available' : 'Reserved'}
-            </span>
+            {isAmenity ? (
+              <span className="self-start shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                Map label only
+              </span>
+            ) : (
+              <span className={`${isResourceAvailable(desk) ? 'badge-green' : 'badge-red'} self-start shrink-0 whitespace-nowrap`}>
+                {isResourceAvailable(desk) ? 'Available' : 'Reserved'}
+              </span>
+            )}
+            {isTeamLeaderOnly && (
+              <span className="badge-amber self-start shrink-0 whitespace-nowrap">
+                Team leaders only
+              </span>
+            )}
           </div>
+
+          {isTeamLeaderOnly && !canReserveTeamLeaderOnly && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              This resource can only be reserved by team leaders. Ask your team leader to assign it to you.
+            </div>
+          )}
+          {isAmenity && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              This is an amenity marker for wayfinding only. It cannot be reserved.
+            </div>
+          )}
 
           <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm font-semibold text-slate-900">Next available</div>
@@ -184,10 +211,10 @@ export default function ResourceDetailsModal({
             <button
               type="button"
               onClick={onBook}
-              disabled={booking || isResourceReservedByOther(desk) || desk.is_mine}
+              disabled={booking || isAmenity || isReservedConflict || desk.is_mine || !canReserveTeamLeaderOnly}
               className="btn-primary w-full py-3"
             >
-              {booking ? 'Reserving...' : 'Reserve now'}
+              {isAmenity ? 'Cannot be reserved' : booking ? 'Reserving...' : 'Reserve now'}
             </button>
             <button
               type="button"

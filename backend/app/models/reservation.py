@@ -1,7 +1,7 @@
 import enum
 from datetime import date, time
 
-from sqlalchemy import Date, Enum, ForeignKey, Time, UniqueConstraint
+from sqlalchemy import Date, Enum, ForeignKey, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -15,9 +15,6 @@ class ReservationStatus(str, enum.Enum):
 
 class Reservation(Base):
     __tablename__ = "reservations"
-    __table_args__ = (
-        UniqueConstraint("resource_id", "date", name="uq_resource_date"),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

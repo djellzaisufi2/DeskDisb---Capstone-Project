@@ -53,8 +53,11 @@ class Settings(BaseSettings):
 
     @property
     def database_configured(self) -> bool:
-        return not self.database_url.startswith("postgresql://deskdibs:deskdibs@localhost")
+        return self.database_url.startswith(("postgresql://", "postgresql+psycopg://"))
+
+    @property
+    def using_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
 
 
 settings = Settings()
-

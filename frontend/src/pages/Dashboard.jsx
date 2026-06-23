@@ -18,7 +18,6 @@ import {
   CalendarCheck,
   LocateFixed,
   Percent,
-  Plus,
 } from 'lucide-react';
 import { getEmployeeSummary, getMyReservations } from '../api/client';
 import KpiCard from '../components/ui/KpiCard';
@@ -129,7 +128,7 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500">Reserve your workspace in seconds</p>
           <div className="mt-5 space-y-3">
             <Link to="/floor-plan" className="btn-primary w-full py-3">
-              <Plus size={18} /> Reserve Desk
+              <Armchair size={18} /> Reserve a seat
             </Link>
             <Link to="/floor-plan?type=room" className="btn-secondary w-full py-3">
               <Building2 size={18} /> Reserve Room
@@ -139,9 +138,6 @@ export default function Dashboard() {
                 <LocateFixed size={18} /> Find me a desk near my team
               </Link>
             )}
-            <Link to="/floor-plan" className="btn-secondary w-full py-3">
-              <Armchair size={18} /> Reserve a seat
-            </Link>
           </div>
         </div>
       </div>

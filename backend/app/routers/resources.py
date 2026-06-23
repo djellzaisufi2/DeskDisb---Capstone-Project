@@ -102,7 +102,12 @@ def recommend_near_team(
     current_user: User = Depends(get_current_user),
 ):
     if not current_user.team_name:
-        resources = db.query(Resource).filter(Resource.is_active.is_(True)).limit(6).all()
+        resources = (
+            db.query(Resource)
+            .filter(Resource.is_active.is_(True), Resource.type == ResourceType.desk)
+            .limit(6)
+            .all()
+        )
         return TeamDeskRecommendation(
             team_name=None,
             team_zone=None,
@@ -127,7 +132,7 @@ def recommend_near_team(
     if recent_reservations:
         zone = Counter(z for _, z in recent_reservations).most_common(1)[0][0]
 
-    query = db.query(Resource).filter(Resource.is_active.is_(True))
+    query = db.query(Resource).filter(Resource.is_active.is_(True), Resource.type == ResourceType.desk)
     if zone:
         query = query.filter(Resource.zone == zone)
     resources = query.order_by(Resource.floor, Resource.name).limit(12).all()

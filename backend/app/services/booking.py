@@ -26,6 +26,41 @@ def active_reservation_for_resource(
     )
 
 
+def conflicting_reservation_for_resource(
+    db: Session,
+    resource: Resource,
+    booking_date: date,
+    start_time: time | None = None,
+    end_time: time | None = None,
+    exclude_reservation_id: int | None = None,
+) -> Reservation | None:
+    query = db.query(Reservation).filter(
+        Reservation.resource_id == resource.id,
+        Reservation.date == booking_date,
+        Reservation.status == ReservationStatus.active,
+    )
+    if exclude_reservation_id is not None:
+        query = query.filter(Reservation.id != exclude_reservation_id)
+
+    if resource.type != "room":
+        return query.first()
+
+    if start_time is None or end_time is None:
+        return query.first()
+
+    return (
+        query.filter(
+            (Reservation.start_time.is_(None))
+            | (Reservation.end_time.is_(None))
+            | (
+                (Reservation.start_time < end_time)
+                & (Reservation.end_time > start_time)
+            )
+        )
+        .first()
+    )
+
+
 def validate_booking_rules(
     db: Session,
     user: User,
@@ -34,7 +69,9 @@ def validate_booking_rules(
     start_time: time | None = None,
     end_time: time | None = None,
     exclude_reservation_id: int | None = None,
+    actor: User | None = None,
 ):
+    actor = actor or user
     today = date.today()
     max_date = today + timedelta(days=settings.max_booking_days_ahead)
 
@@ -50,20 +87,19 @@ def validate_booking_rules(
     if not resource or not resource.is_active:
         raise HTTPException(status_code=404, detail="Resource not found or inactive")
 
-    active_on_resource = active_reservation_for_resource(
-        db,
-        resource_id,
-        booking_date,
-    )
-    if active_on_resource and (
-        exclude_reservation_id is None or active_on_resource.id != exclude_reservation_id
-    ):
+    if resource.type not in ("desk", "room"):
         raise HTTPException(
-            status_code=409,
-            detail="This resource is already booked for the selected date",
+            status_code=400,
+            detail="This resource is an amenity marker and cannot be reserved",
         )
 
-    if resource.type == "room" and user.role not in (UserRole.team_leader, UserRole.manager):
+    if resource.restricted_to_team_leaders and actor.role != UserRole.team_leader:
+        raise HTTPException(
+            status_code=403,
+            detail="This resource can only be reserved by team leaders",
+        )
+
+    if resource.type == "room" and actor.role not in (UserRole.team_leader, UserRole.manager):
         raise HTTPException(
             status_code=403,
             detail="Only team leaders and managers can reserve meeting rooms",
@@ -85,6 +121,22 @@ def validate_booking_rules(
                 status_code=400,
                 detail="Desk reservations do not use time slots",
             )
+
+    conflict = conflicting_reservation_for_resource(
+        db,
+        resource,
+        booking_date,
+        start_time,
+        end_time,
+        exclude_reservation_id,
+    )
+    if conflict:
+        detail = (
+            "This room is already booked during the selected time"
+            if resource.type == "room" and start_time and end_time
+            else "This resource is already booked for the selected date"
+        )
+        raise HTTPException(status_code=409, detail=detail)
 
     same_day_query = (
         db.query(Reservation)
@@ -151,29 +203,22 @@ def create_reservation(
     booking_date: date,
     start_time: time | None = None,
     end_time: time | None = None,
+    actor: User | None = None,
 ) -> Reservation:
-    active_on_resource = active_reservation_for_resource(db, resource_id, booking_date)
-    if active_on_resource and active_on_resource.user_id == user.id:
-        return active_on_resource
-
-    validate_booking_rules(db, user, resource_id, booking_date, start_time, end_time)
+    validate_booking_rules(db, user, resource_id, booking_date, start_time, end_time, actor=actor)
 
     existing = (
         db.query(Reservation)
+        .join(Resource)
         .filter(
             Reservation.resource_id == resource_id,
             Reservation.date == booking_date,
+            Reservation.status != ReservationStatus.active,
+            Resource.type != "room",
         )
         .first()
     )
     if existing:
-        if existing.status == ReservationStatus.active:
-            if existing.user_id == user.id:
-                return existing
-            raise HTTPException(
-                status_code=409,
-                detail="This resource is already booked for the selected date",
-            )
         existing.user_id = user.id
         existing.status = ReservationStatus.active
         existing.start_time = start_time
@@ -197,20 +242,15 @@ def create_reservation(
         db.rollback()
         existing = (
             db.query(Reservation)
+            .join(Resource)
             .filter(
                 Reservation.resource_id == resource_id,
                 Reservation.date == booking_date,
+                Reservation.status == ReservationStatus.active,
+                Resource.type != "room",
             )
             .first()
         )
-        if existing and existing.status != ReservationStatus.active:
-            existing.user_id = user.id
-            existing.status = ReservationStatus.active
-            existing.start_time = start_time
-            existing.end_time = end_time
-            db.commit()
-            db.refresh(existing)
-            return existing
         if existing and existing.user_id == user.id:
             return existing
         raise HTTPException(status_code=409, detail="This resource is already booked for the selected date")
@@ -225,9 +265,10 @@ def create_recurring_reservations(
     repeat_weeks: int,
     start_time: time | None = None,
     end_time: time | None = None,
+    actor: User | None = None,
 ) -> list[Reservation]:
     created = [
-        create_reservation(db, user, resource_id, booking_date, start_time, end_time),
+        create_reservation(db, user, resource_id, booking_date, start_time, end_time, actor),
     ]
     for week in range(1, max(0, repeat_weeks) + 1):
         created.append(
@@ -238,6 +279,7 @@ def create_recurring_reservations(
                 booking_date + timedelta(days=7 * week),
                 start_time,
                 end_time,
+                actor,
             )
         )
     return created
@@ -260,22 +302,6 @@ def update_reservation(
         end_time,
         exclude_reservation_id=reservation.id,
     )
-
-    existing = (
-        db.query(Reservation)
-        .filter(
-            Reservation.resource_id == resource_id,
-            Reservation.date == booking_date,
-            Reservation.id != reservation.id,
-            Reservation.status == ReservationStatus.active,
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail="This resource is already booked for the selected date",
-        )
 
     reservation.resource_id = resource_id
     reservation.date = booking_date

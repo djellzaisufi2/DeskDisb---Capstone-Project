@@ -2,11 +2,13 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: sqlite:////data/deskdibs.db
-      VITE_API_URL: http://backend:8002/api
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the Supabase Postgres connection string}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://deskdibs.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://deskdibs.com,https://www.deskdibs.com}
     volumes:
-      - backend-data:/data
       - backend-uploads:/app/uploads
     ports:
       - "8002:8002"
@@ -15,12 +17,11 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_URL: http://backend:8002/api
+      VITE_API_URL: /api
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "3006:3000"
 
 volumes:
-  backend-data:
   backend-uploads:

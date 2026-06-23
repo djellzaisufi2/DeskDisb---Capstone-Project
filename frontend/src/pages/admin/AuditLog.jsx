@@ -15,8 +15,8 @@ export default function AuditLog() {
         title="Audit Log"
         subtitle="Administrative actions recorded for accountability"
       />
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain sm:max-h-none">
+        <table className="min-w-[760px] w-full text-sm">
           <thead>
             <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">When</th>

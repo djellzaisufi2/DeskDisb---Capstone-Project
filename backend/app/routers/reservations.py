@@ -264,6 +264,7 @@ def book_team_desks(
                 data.repeat_weeks,
                 None,
                 None,
+                current_user,
             )
         )
 

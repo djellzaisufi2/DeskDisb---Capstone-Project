@@ -31,6 +31,10 @@ export default function DeskDetailPanel({
 }) {
   const image = DESK_IMAGES[desk.desk_type ?? ''] ?? DESK_IMAGES.default;
   const amenities = desk.amenities?.split(',').map((a) => a.trim()).filter(Boolean) ?? [];
+  const isTeamLeaderOnly = Boolean(desk.restricted_to_team_leaders);
+  const canReserveTeamLeaderOnly = !isTeamLeaderOnly || canBookTeam;
+  const isAmenity = desk.type === 'amenity';
+  const canShowReserveAction = !isAmenity && !desk.is_mine && (desk.type === 'room' || isResourceAvailable(desk));
 
   return (
     <div className="card-elevated flex max-h-[calc(100dvh-5rem)] w-full flex-col overflow-hidden xl:h-full xl:max-h-none">
@@ -61,7 +65,9 @@ export default function DeskDetailPanel({
         {desk.desk_type && <p className="text-sm text-slate-500">{desk.desk_type}</p>}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {desk.is_mine ? (
+          {isAmenity ? (
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">Map label only</span>
+          ) : desk.is_mine ? (
             <span className="badge-blue">My Reservation</span>
           ) : isResourceAvailable(desk) ? (
             <span className="badge-green">Available</span>
@@ -73,6 +79,9 @@ export default function DeskDetailPanel({
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">
             <MapPin size={11} /> Capacity {desk.capacity}
           </span>
+          {isTeamLeaderOnly && (
+            <span className="badge-amber">Team leaders only</span>
+          )}
         </div>
 
         {amenities.length > 0 && (
@@ -152,6 +161,16 @@ export default function DeskDetailPanel({
             Meeting rooms can only be reserved by team leaders and managers.
           </div>
         )}
+        {isAmenity && (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            This is an amenity marker for wayfinding only. It cannot be reserved.
+          </div>
+        )}
+        {isTeamLeaderOnly && !canReserveTeamLeaderOnly && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            This resource is reserved for team leaders. Ask your team leader to assign it to you.
+          </div>
+        )}
 
         {desk.type === 'desk' && isResourceReservedByOther(desk) && (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -184,8 +203,13 @@ export default function DeskDetailPanel({
           </div>
         )}
 
-        {isResourceAvailable(desk) && !desk.is_mine && (
-          <button type="button" onClick={onBook} disabled={booking} className="btn-primary mt-4 w-full">
+        {canShowReserveAction && (
+          <button
+            type="button"
+            onClick={onBook}
+            disabled={booking || !canReserveTeamLeaderOnly}
+            className="btn-primary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
             <Calendar size={16} />
             {booking ? 'Reserving...' : 'Reserve Now'}
           </button>

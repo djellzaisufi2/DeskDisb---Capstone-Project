@@ -143,14 +143,8 @@ export default function FloorPlan() {
   }, [date, floor, zone, zoneFilters, type, nearTeam, user?.role, canUseTeamDeskFinder]);
 
   useEffect(() => {
-    if (selected?.type !== 'room') {
-      setReservationMode('all_day');
-      return;
-    }
-    if (reservationMode !== 'slot' && reservationMode !== 'all_day') {
-      setReservationMode('all_day');
-    }
-  }, [selected, reservationMode]);
+    setReservationMode(selected?.type === 'room' ? 'slot' : 'all_day');
+  }, [selected?.id, selected?.type]);
 
   useEffect(() => {
     if (!resourceId || !resources.length) return;
@@ -175,6 +169,9 @@ export default function FloorPlan() {
   const plan = plans.find((p) => p.floor === floor);
   const maxDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
   const alternativeDesks = selected ? getAlternativeDesks(resources, selected) : [];
+  const canReserveResource = (resource) =>
+    resource?.type !== 'amenity' &&
+    (!resource?.restricted_to_team_leaders || user?.role === 'team_leader');
 
   const getStatus = (r) => {
     if (selected?.id === r.id) return 'selected';
@@ -191,8 +188,18 @@ export default function FloorPlan() {
 
   const handleBook = async () => {
     if (!selected) return;
-    if (isResourceReservedByOther(selected)) {
+    if (selected.type !== 'room' && isResourceReservedByOther(selected)) {
       setMessage('This desk is already reserved. Choose an available desk.');
+      return;
+    }
+    if (selected.type === 'amenity') {
+      setMessage('Amenities are map labels only and cannot be reserved.');
+      toast.info('Amenities are map labels only.');
+      return;
+    }
+    if (!canReserveResource(selected)) {
+      setMessage('This resource can only be reserved by team leaders.');
+      toast.warn('This resource can only be reserved by team leaders.');
       return;
     }
     setBooking(true);
@@ -209,7 +216,7 @@ export default function FloorPlan() {
         setMessage('This seat is no longer available on the current floor plan.');
         return;
       }
-      if (isResourceReservedByOther(latestSelected)) {
+      if (selected.type !== 'room' && isResourceReservedByOther(latestSelected)) {
         setSelected(latestSelected);
         setResources(sortByNaturalName(latestResources));
         setMessage(
@@ -519,6 +526,21 @@ export default function FloorPlan() {
               {resources
                 .filter((r) => r.floor_plan_x != null && r.floor_plan_y != null)
                 .map((r) => {
+                  if (r.type === 'amenity') {
+                    return (
+                      <div
+                        key={r.id}
+                        title={`${r.name} - ${r.zone}`}
+                        style={{
+                          left: `${r.floor_plan_x}%`,
+                          top: `${r.floor_plan_y}%`,
+                        }}
+                        className="absolute z-[1] -translate-x-1/2 -translate-y-1/2 rounded-md border border-slate-300 bg-white/95 px-2 py-1 text-[11px] font-semibold text-slate-800 shadow-sm sm:text-xs"
+                      >
+                        {r.name}
+                      </div>
+                    );
+                  }
                   const status = getStatus(r);
                   const s = STATUS[status];
                   return (
@@ -605,6 +627,7 @@ export default function FloorPlan() {
           onToggleFavorite={handleToggleFavorite}
           favoriteBusy={favoriteBusy}
           booking={booking}
+          canReserveTeamLeaderOnly={canReserveResource(selected)}
         />
       )}
 
@@ -766,7 +789,9 @@ export default function FloorPlan() {
                     Floor {r.floor} - {r.zone}
                   </p>
                 </div>
-                {r.is_mine ? (
+                {r.type === 'amenity' ? (
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">Map label</span>
+                ) : r.is_mine ? (
                   <span className="badge-blue shrink-0">Mine</span>
                 ) : isResourceAvailable(r) ? (
                   <span className="badge-green shrink-0">Available</span>
@@ -777,6 +802,12 @@ export default function FloorPlan() {
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 capitalize">{r.type}</span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1">{r.desk_type ?? 'Standard'}</span>
+                {r.restricted_to_team_leaders && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Team leaders only</span>
+                )}
+                {r.type === 'amenity' && (
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">Map label only</span>
+                )}
               </div>
             </button>
           ))}
@@ -792,6 +823,7 @@ export default function FloorPlan() {
               <th className="px-6 py-3">Zone</th>
               <th className="px-6 py-3">Type</th>
               <th className="px-6 py-3">Desk Type</th>
+              <th className="px-6 py-3">Access</th>
               <th className="px-6 py-3">Status</th>
             </tr>
           </thead>
@@ -808,7 +840,16 @@ export default function FloorPlan() {
                 <td className="px-6 py-3.5 capitalize text-slate-600">{r.type}</td>
                 <td className="px-6 py-3.5 text-slate-600">{r.desk_type ?? '-'}</td>
                 <td className="px-6 py-3.5">
-                  {r.is_mine ? (
+                  {r.restricted_to_team_leaders ? (
+                    <span className="badge-amber">Team leaders only</span>
+                  ) : (
+                    <span className="text-slate-500">Open</span>
+                  )}
+                </td>
+                <td className="px-6 py-3.5">
+                  {r.type === 'amenity' ? (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">Map label</span>
+                  ) : r.is_mine ? (
                     <span className="badge-blue">Mine</span>
                   ) : isResourceAvailable(r) ? (
                     <span className="badge-green">Available</span>

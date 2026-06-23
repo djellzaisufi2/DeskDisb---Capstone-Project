@@ -35,6 +35,11 @@ const DESK_TYPE_OPTIONS = [
   'Team Pod',
   'Executive Desk',
   'Meeting Room',
+  'Kitchen',
+  'Library',
+  'Break Area',
+  'Printer Area',
+  'Reception',
 ];
 const CAPACITY_OPTIONS = [1, 2, 4, 6, 8, 10, 12];
 const CUSTOM_VALUE = '__custom__';
@@ -48,6 +53,7 @@ const emptyForm = {
   capacity: 1,
   desk_type: 'Hot Desk',
   amenities: '',
+  restricted_to_team_leaders: false,
 };
 
 function OptionField({
@@ -219,6 +225,7 @@ export default function Resources() {
       capacity: resource.capacity,
       desk_type: resource.desk_type ?? '',
       amenities: resource.amenities ?? '',
+      restricted_to_team_leaders: Boolean(resource.restricted_to_team_leaders),
     });
     setEditing(resource.id);
     setShowForm(true);
@@ -350,13 +357,20 @@ export default function Resources() {
                 setForm({
                   ...form,
                   type: e.target.value,
-                  desk_type: e.target.value === 'room' ? 'Meeting Room' : form.desk_type,
+                  desk_type:
+                    e.target.value === 'room'
+                      ? 'Meeting Room'
+                      : e.target.value === 'amenity'
+                        ? 'Kitchen'
+                        : form.desk_type,
+                  capacity: e.target.value === 'amenity' ? 0 : form.capacity || 1,
                 })
               }
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="desk">Desk</option>
               <option value="room">Room</option>
+              <option value="amenity">Amenity marker</option>
             </select>
           </div>
 
@@ -399,11 +413,23 @@ export default function Resources() {
           />
 
           <OptionField
-            label="Desk Type"
+            label={form.type === 'amenity' ? 'Amenity Type' : 'Desk Type'}
             value={form.desk_type}
-            options={form.type === 'room' ? ['Meeting Room'] : deskTypeChoices.filter((item) => item !== 'Meeting Room')}
+            options={
+              form.type === 'room'
+                ? ['Meeting Room']
+                : form.type === 'amenity'
+                  ? ['Kitchen', 'Library', 'Break Area', 'Printer Area', 'Reception']
+                  : deskTypeChoices.filter((item) => item !== 'Meeting Room')
+            }
             onChange={(value) => setForm({ ...form, desk_type: value })}
-            customPlaceholder={form.type === 'room' ? 'Enter room type' : 'Enter desk type'}
+            customPlaceholder={
+              form.type === 'room'
+                ? 'Enter room type'
+                : form.type === 'amenity'
+                  ? 'Enter amenity type'
+                  : 'Enter desk type'
+            }
           />
 
           <div>
@@ -414,6 +440,7 @@ export default function Resources() {
               value={String(form.capacity)}
               onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              disabled={form.type === 'amenity'}
             >
               {CAPACITY_OPTIONS.map((capacity) => (
                 <option key={capacity} value={capacity}>
@@ -421,6 +448,11 @@ export default function Resources() {
                 </option>
               ))}
             </select>
+            {form.type === 'amenity' && (
+              <p className="mt-1 text-xs text-slate-500">
+                Amenity markers are map labels only and cannot be booked.
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-2 lg:col-span-3">
@@ -434,6 +466,23 @@ export default function Resources() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
+            <input
+              type="checkbox"
+              checked={form.restricted_to_team_leaders}
+              onChange={(e) => setForm({ ...form, restricted_to_team_leaders: e.target.checked })}
+              className="mt-1 rounded border-slate-300 text-brand-600"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">
+                Team leaders only
+              </span>
+              <span className="mt-1 block text-sm text-slate-500">
+                Only team leaders can reserve this desk or room. Team leaders can assign restricted desks to members of their own team.
+              </span>
+            </span>
+          </label>
 
           <div className="sm:col-span-2 lg:col-span-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -567,6 +616,10 @@ export default function Resources() {
                       <strong className="block text-slate-500">Desk Type</strong>
                       {resource.desk_type ?? '-'}
                     </span>
+                    <span className="col-span-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                      <strong className="block text-slate-500">Access</strong>
+                      {resource.restricted_to_team_leaders ? 'Team leaders only' : 'Open'}
+                    </span>
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-3">
@@ -598,7 +651,7 @@ export default function Resources() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[920px] w-full text-sm">
+          <table className="min-w-[1040px] w-full text-sm">
           <thead>
             <tr className="border-b bg-slate-50 text-left text-slate-500">
               <th className="px-4 py-3 font-medium">
@@ -616,6 +669,7 @@ export default function Resources() {
               <th className="px-4 py-3 font-medium">Floor</th>
               <th className="px-4 py-3 font-medium">Zone</th>
               <th className="px-4 py-3 font-medium">Desk Type</th>
+              <th className="px-4 py-3 font-medium">Access</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
@@ -637,6 +691,13 @@ export default function Resources() {
                 <td className="px-4 py-3">{resource.floor}</td>
                 <td className="px-4 py-3">{resource.zone}</td>
                 <td className="px-4 py-3">{resource.desk_type ?? '-'}</td>
+                <td className="px-4 py-3">
+                  {resource.restricted_to_team_leaders ? (
+                    <span className="badge-amber">Team leaders only</span>
+                  ) : (
+                    <span className="text-slate-500">Open</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button

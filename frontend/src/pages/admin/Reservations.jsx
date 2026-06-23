@@ -178,8 +178,8 @@ export default function AdminReservations() {
       {loading ? (
         <SkeletonTable rows={7} columns={7} />
       ) : (
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card max-h-[calc(100dvh-14rem)] overflow-auto overscroll-contain sm:max-h-none">
+        <table className="min-w-[900px] w-full text-sm">
           <thead>
             <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">User</th>

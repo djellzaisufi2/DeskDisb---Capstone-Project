@@ -12,6 +12,7 @@ class ResourceBase(BaseModel):
     capacity: int = 1
     amenities: str | None = None
     desk_type: str | None = None
+    restricted_to_team_leaders: bool = False
     floor_plan_x: float | None = None
     floor_plan_y: float | None = None
 
@@ -29,6 +30,7 @@ class ResourceUpdate(BaseModel):
     capacity: int | None = None
     amenities: str | None = None
     desk_type: str | None = None
+    restricted_to_team_leaders: bool | None = None
     floor_plan_x: float | None = None
     floor_plan_y: float | None = None
     is_active: bool | None = None

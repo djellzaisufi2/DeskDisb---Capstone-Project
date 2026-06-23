@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
+    allowedHosts: ['deskdibs.com', 'www.deskdibs.com'],
     proxy: process.env.VITE_API_URL
       ? undefined
       : {

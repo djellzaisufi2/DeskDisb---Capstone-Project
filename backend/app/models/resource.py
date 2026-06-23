@@ -9,6 +9,7 @@ from app.database import Base
 class ResourceType(str, enum.Enum):
     desk = "desk"
     room = "room"
+    amenity = "amenity"
 
 
 class Resource(Base):
@@ -25,6 +26,7 @@ class Resource(Base):
     capacity: Mapped[int] = mapped_column(default=1)
     amenities: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    restricted_to_team_leaders: Mapped[bool] = mapped_column(Boolean, default=False)
     desk_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     reservations = relationship("Reservation", back_populates="resource")

@@ -52,11 +52,18 @@ def _add_column_if_missing(conn, table_name: str, column_name: str, column_defin
 
 
 def _ensure_database_schema():
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TYPE resourcetype ADD VALUE IF NOT EXISTS 'amenity'"))
+
     Base.metadata.create_all(bind=engine)
 
     dialect = engine.dialect.name
     is_sqlite = dialect == "sqlite"
     with engine.begin() as conn:
+        if not is_sqlite:
+            conn.execute(text("ALTER TABLE reservations DROP CONSTRAINT IF EXISTS uq_resource_date"))
+
         _add_column_if_missing(conn, "users", "team_name", "VARCHAR(150)")
         _add_column_if_missing(conn, "users", "team_leader_id", "INTEGER")
         _add_column_if_missing(conn, "users", "password_reset_token_hash", "VARCHAR(255)")
@@ -84,6 +91,12 @@ def _ensure_database_schema():
             "VARCHAR(120) DEFAULT 'HQ - Prishtina'",
         )
         conn.execute(text("UPDATE resources SET building = 'HQ - Prishtina' WHERE building IS NULL"))
+        _add_column_if_missing(
+            conn,
+            "resources",
+            "restricted_to_team_leaders",
+            "BOOLEAN DEFAULT 0" if is_sqlite else "BOOLEAN DEFAULT false",
+        )
 
         _add_column_if_missing(conn, "floor_plans", "name", "VARCHAR(150)")
         conn.execute(text("UPDATE floor_plans SET name = 'Floor ' || floor WHERE name IS NULL"))
@@ -137,8 +150,9 @@ def _ensure_initial_admin():
 @app.on_event("startup")
 def startup():
     if not settings.database_configured:
-        logger.warning("DATABASE_URL is not configured for production")
-        return
+        raise RuntimeError("DATABASE_URL must be set to the Supabase Postgres connection string")
+    if settings.using_sqlite:
+        raise RuntimeError("SQLite is disabled for this deployment; set DATABASE_URL to Supabase Postgres")
 
     try:
         _ensure_database_schema()

@@ -31,6 +31,8 @@ const emptyResourceForm = {
   amenities: '',
 };
 
+const AMENITY_TYPES = ['Kitchen', 'Library', 'Break Area', 'Printer Area', 'Reception'];
+
 const withFreshImage = (plan) => ({
   ...plan,
   image_url: `${plan.image_url}${plan.image_url.includes('?') ? '&' : '?'}v=${Date.now()}`,
@@ -249,10 +251,13 @@ export default function FloorBuilder() {
         floor: resourceFloor,
         zone: resourceForm.zone.trim(),
         amenities: resourceForm.amenities.trim() || undefined,
+        capacity: resourceForm.type === 'amenity' ? 0 : resourceForm.capacity,
         desk_type:
           resourceForm.type === 'room'
             ? 'Meeting Room'
-            : resourceForm.desk_type.trim() || undefined,
+            : resourceForm.type === 'amenity'
+              ? resourceForm.desk_type.trim() || 'Amenity'
+              : resourceForm.desk_type.trim() || undefined,
       });
       const updated = await getResources({ floor: resourceFloor });
       setFloor(resourceFloor);
@@ -391,7 +396,7 @@ export default function FloorBuilder() {
               <div>
                 <h4 className="text-sm font-semibold text-slate-900">Add Resource</h4>
                 <p className="text-xs text-slate-500">
-                  Create a desk or meeting room and save it to show everywhere in the app.
+                  Create a bookable desk/room or a non-bookable amenity label such as Kitchen or Library.
                 </p>
               </div>
               <button
@@ -417,13 +422,20 @@ export default function FloorBuilder() {
                     setResourceForm({
                       ...resourceForm,
                       type: e.target.value,
-                      desk_type: e.target.value === 'room' ? 'Meeting Room' : resourceForm.desk_type,
+                      desk_type:
+                        e.target.value === 'room'
+                          ? 'Meeting Room'
+                          : e.target.value === 'amenity'
+                            ? 'Kitchen'
+                            : resourceForm.desk_type,
+                      capacity: e.target.value === 'amenity' ? 0 : resourceForm.capacity || 1,
                     })
                   }
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 >
                   <option value="desk">Desk</option>
                   <option value="room">Meeting Room</option>
+                  <option value="amenity">Amenity marker</option>
                 </select>
                 <input
                   value={resourceForm.floor}
@@ -450,6 +462,7 @@ export default function FloorBuilder() {
                   onChange={(e) => setResourceForm({ ...resourceForm, capacity: Number(e.target.value) })}
                   placeholder="Capacity"
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  disabled={resourceForm.type === 'amenity'}
                 />
                 {resourceForm.type === 'desk' ? (
                   <input
@@ -458,6 +471,18 @@ export default function FloorBuilder() {
                     placeholder="Desk type"
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
                   />
+                ) : resourceForm.type === 'amenity' ? (
+                  <select
+                    value={resourceForm.desk_type}
+                    onChange={(e) => setResourceForm({ ...resourceForm, desk_type: e.target.value })}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+                  >
+                    {AMENITY_TYPES.map((amenity) => (
+                      <option key={amenity} value={amenity}>
+                        {amenity}
+                      </option>
+                    ))}
+                  </select>
                 ) : null}
                 <input
                   value={resourceForm.amenities}
@@ -509,7 +534,7 @@ export default function FloorBuilder() {
                 >
                   {resource.name}
                   <span className="block text-xs text-slate-400">
-                    {resource.building} - {resource.zone}
+                    {resource.type === 'amenity' ? 'Amenity marker' : resource.building} - {resource.zone}
                   </span>
                 </button>
               ))}
@@ -546,32 +571,43 @@ export default function FloorBuilder() {
                   )}
                   {resources
                     .filter((resource) => resource.floor_plan_x != null && resource.floor_plan_y != null)
-                    .map((resource) => (
-                      <div
-                        key={resource.id}
-                        role="button"
-                        tabIndex={0}
-                        title={`${resource.name} - ${resource.zone}`}
-                        onMouseDown={(event) => {
-                          event.stopPropagation();
-                          setSelected(resource);
-                          setDragging(resource.id);
-                        }}
-                        onMouseMove={(e) => dragging === resource.id && handleDrag(e, resource)}
-                        onMouseUp={() => dragging === resource.id && handleDragEnd(resource)}
-                        onMouseLeave={() => dragging === resource.id && handleDragEnd(resource)}
-                        style={{
-                          left: `${resource.floor_plan_x}%`,
-                          top: `${resource.floor_plan_y}%`,
-                        }}
-                        className={`group absolute z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-2 border-white shadow-md transition hover:scale-125 focus:outline-none focus:ring-4 ${
-                          selected?.id === resource.id
-                            ? 'bg-amber-400 ring-4 ring-amber-300'
-                            : 'bg-emerald-500 ring-2 ring-emerald-300 focus:ring-emerald-200'
-                        }`}
-                        aria-label={`${resource.name} pin`}
-                      />
-                    ))}
+                    .map((resource) => {
+                      const isAmenity = resource.type === 'amenity';
+                      return (
+                        <div
+                          key={resource.id}
+                          role="button"
+                          tabIndex={0}
+                          title={`${resource.name} - ${resource.zone}`}
+                          onMouseDown={(event) => {
+                            event.stopPropagation();
+                            setSelected(resource);
+                            setDragging(resource.id);
+                          }}
+                          onMouseMove={(e) => dragging === resource.id && handleDrag(e, resource)}
+                          onMouseUp={() => dragging === resource.id && handleDragEnd(resource)}
+                          onMouseLeave={() => dragging === resource.id && handleDragEnd(resource)}
+                          style={{
+                            left: `${resource.floor_plan_x}%`,
+                            top: `${resource.floor_plan_y}%`,
+                          }}
+                          className={
+                            isAmenity
+                              ? `absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-md border border-slate-300 bg-white/95 px-2 py-1 text-xs font-semibold text-slate-800 shadow transition hover:scale-105 ${
+                                  selected?.id === resource.id ? 'ring-4 ring-amber-300' : ''
+                                }`
+                              : `group absolute z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-2 border-white shadow-md transition hover:scale-125 focus:outline-none focus:ring-4 ${
+                                  selected?.id === resource.id
+                                    ? 'bg-amber-400 ring-4 ring-amber-300'
+                                    : 'bg-emerald-500 ring-2 ring-emerald-300 focus:ring-emerald-200'
+                                }`
+                          }
+                          aria-label={`${resource.name} ${isAmenity ? 'label' : 'pin'}`}
+                        >
+                          {isAmenity ? resource.name : null}
+                        </div>
+                      );
+                    })}
                 </div>
               ) : (
                 <div className="flex h-full items-center justify-center text-slate-400">

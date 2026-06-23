@@ -53,8 +53,7 @@ create table public.reservations (
   date date not null,
   start_time time,
   end_time time,
-  status public.reservationstatus not null default 'active',
-  constraint uq_resource_date unique (resource_id, date)
+  status public.reservationstatus not null default 'active'
 );
 
 create table public.floor_plans (
